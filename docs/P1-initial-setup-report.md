@@ -1,198 +1,194 @@
 # Initial Setup Report (P1)
 
-**Course:** COMP 8967 — University of Windsor, Fall 2026
-**Business:** Aerrand Technologies Inc. (Business 3) · **Group:** 6
-**Team name:** _[FILL: pick one — see suggestions at bottom]_
+**Course:** COMP 8967, University of Windsor, Fall 2026
+**Business:** Aerrand Technologies Inc. (Business 3) | **Group:** 6
+**Team name:** Keysmiths *(confirm or change)*
 
-> ⚠️ Hard limit: **3 pages.** This markdown is the working draft; trim the examples/placeholders
-> before exporting to the 3-page submission. Items in **[FILL: …]** need a human.
-
----
+> Draft note: keep the final submission to 3 pages. Lines marked *(fill in)* or *(confirm)*
+> need the team to check or add something.
 
 ## 1. Project Details
 
-### Challenge Description (our words)
-Aerrand is a Windsor startup that makes buying and selling secondhand items safe: instead of
-meeting a stranger, a vetted local driver ("Aerrander") verifies, picks up, and delivers the
-item. Today, a business that wants Aerrand to run a delivery has to log into Aerrand's
-dashboard and fill in a form by hand. Our challenge is to build the **API key infrastructure
-and a public API (`api.aerrand.com/v1`)** that lets a partner's *software* do this
-automatically — the same way a checkout page offers "Log in with Google" instead of building
-its own login. The core difficulty is doing it safely: today the delivery price is sent from
-the browser and trusted by the server, which is fine for Aerrand's own dashboard but unsafe
-the moment outside code can call in. So the server must compute price itself, keys must be
-authenticated and revocable, and the new API must be a **separate, locked-down front door**
-that reuses Aerrand's existing pricing and dispatch logic without exposing the legacy system.
+### Challenge Description
+
+Aerrand is a Windsor startup that makes buying and selling used items safer. Instead of two
+strangers meeting up, a vetted local driver verifies the item, picks it up, and delivers it.
+The problem they gave us is this: right now, any business that wants Aerrand to run a delivery
+has to log into Aerrand's dashboard and fill out a form by hand. Aerrand wants partners (like
+online stores or marketplaces) to be able to do that straight from their own software instead.
+
+The way that happens is through an API key, which is basically a secret token that lets a
+partner's code prove who it is and book a delivery automatically. Our job is to build that key
+system plus a clean public API around it. The tricky part is doing it safely. Today the price
+of a delivery is sent from the browser and the server just trusts it, which is fine when only
+Aerrand's own dashboard is calling. The moment outside code can call in, that becomes a hole,
+so the server has to work out the price itself. We also can't just add keys onto the old
+endpoints, because those weren't built to face the public. So we build a separate, locked-down
+entrance that reuses Aerrand's existing pricing and delivery logic but exposes nothing else.
 
 ### Solution Approach
 
-**Architecture & Design.** We add a new public host and a new, isolated Django app rather
-than bolting keys onto existing endpoints. The request flow:
+**Architecture and design.** We add a new web address for the API and a new, separate section
+of the Django backend to handle it, rather than touching the existing code. A request flows
+like this:
 
 ```mermaid
 flowchart LR
-    I[Partner software<br/>ERP / storefront] -->|Bearer aer_live_… key| C[Caddy<br/>api.aerrand.com]
-    C --> V["Django developer app<br/>(auth → scope → rate limit → idempotency)"]
-    V -->|reuses pricing + dispatch| DB[(MongoDB — shared)]
-    V --> R[(Redis<br/>rate limits · idempotency)]
-    N[Node driver backend] -->|status changes| DB
-    V -. outbox rows .-> OB[(webhook_outbox)]
-    N -. outbox rows .-> OB
-    OB --> D[Webhook dispatcher<br/>signs + POSTs, retries]
-    D -->|HMAC-signed events| I
+    I[Partner software] -->|API key| C[Caddy gateway<br/>api.aerrand.com]
+    C --> V["New API app<br/>check key, scope, rate limit"]
+    V -->|reuses pricing + dispatch| DB[(MongoDB, shared)]
+    V --> R[(Redis<br/>rate limits, retries)]
+    N[Node driver backend] -->|driver updates| DB
+    V -. writes event .-> OB[(webhook_outbox)]
+    N -. writes event .-> OB
+    OB --> D[Dispatcher<br/>signs + sends events]
+    D -->|notifications| I
 ```
 
-*Explanation & trade-offs:*
-- **Separate host/app vs. reusing legacy endpoints** — we isolate the public surface so a key
-  can book but can't reach the legacy `AllowAny` routes. Trade-off: some duplicated routing,
-  but zero risk to the live dashboard/driver apps.
-- **Server-trusted pricing vs. client price** — the server recomputes every price from the
-  stops + routed distance. Trade-off: an extra pricing call, in exchange for closing the
-  "book a delivery for $0.50" hole.
-- **Webhooks via a transactional outbox vs. polling / change streams** — driver events happen
-  in the Node service, which Django can't observe directly. Both services write event rows to
-  a shared `webhook_outbox`; a background dispatcher signs and delivers them with retries. We
-  chose this over polling (laggy, misses states) and Mongo change streams (brittle) because it
-  is explicit, testable, and adds no new infrastructure beyond one worker process.
+A few design choices and the trade-offs behind them:
 
-**Implementation Strategy (milestones & deliverables).** We work in **1-week sprints**,
-delivering one working vertical slice at a time, mirroring Aerrand's own 5-phase rollout:
-- **M0 – Foundations:** repo, Docker Compose + Redis, Caddy host, DB migrations, health check.
-- **M1 – Keys + Quotes:** key issuance/auth/scopes, `POST /v1/quotes` with server pricing.
-- **M2 – Booking + Payment:** `POST /v1/aerrands` (atomic multi-stop), wallet debit, reads.
-- **M3 – Webhooks + Test mode:** outbox writers, dispatcher, retries, sandbox keys.
-- **M4 – Safety + Docs:** idempotency, rate limiting, tenant isolation, OpenAPI docs.
+- We keep the new API on its own address and app so a key can book a delivery but can never
+  reach the old internal routes. This duplicates a little bit of routing, but it means there's
+  no risk to the live dashboard or driver app.
+- The server recalculates every price from the stops and distance instead of trusting the
+  caller. That costs one extra step, but it closes the "book a delivery for 50 cents" problem.
+- For notifications (webhooks), the hard part is that driver updates happen in a separate Node
+  service that Django can't see directly. We looked at having Django constantly check the
+  database, but that's slow and misses quick changes. Instead, both services write a small
+  event row to a shared table, and a background worker reads that table and sends the signed
+  notification. It's simpler to test and needs no new infrastructure beyond one worker.
+
+**Implementation strategy.** We work in one-week sprints and try to finish one working piece
+end to end each time, instead of building everything half-way at once. Rough milestones:
+
+- Weeks 1–2: project setup, database changes, the API gateway, a health check.
+- Weeks 3–4: key creation and login, plus the price-quote endpoint.
+- Weeks 5–6: booking a delivery and paying from the wallet, with tracking.
+- Weeks 7–8: webhooks and a test/sandbox mode.
+- Weeks 9+: safety features (rate limits, retry protection) and developer docs.
 
 ### Technologies Chosen
 
-| Technology | Why | Alternatives (and why not) |
-|-----------|-----|----------------------------|
-| **Python / Django + DRF** | Aerrand's backend is already Django; we must integrate, not rewrite | FastAPI/Flask — would fragment the stack |
-| **Node.js** | The driver backend is Node; webhook outbox writes live there | — (dictated by existing system) |
-| **MongoDB** | Shared DB used by all Aerrand backends | Postgres — not an option mid-system |
-| **Redis** | Rate limiting + idempotency need shared, fast state | In-process cache — breaks across workers |
-| **Caddy** | Existing reverse proxy; auto-TLS for the new host | Nginx — Aerrand already standardized on Caddy |
-| **Docker Compose** | Matches Aerrand's single-droplet deployment | k8s — overkill for this scale |
-| **Stripe** | Existing payment provider (wallet top-ups, checkout) | — |
-| **GitHub + GitHub Actions** | Repo, issues/board (PM), CI | GitLab — team already on GitHub |
-| **OpenAPI 3.1 + Redoc** | Required developer docs; "integrate in an afternoon" goal | Hand-written docs — drift from the API |
+Most of the stack is fixed by the fact that we're plugging into Aerrand's live system, so our
+main reason for each is "it's what they already run and we have to integrate with it."
 
----
+| Technology | Why we're using it | Alternative we skipped |
+|-----------|--------------------|------------------------|
+| Python / Django | Aerrand's backend is already Django | FastAPI/Flask would split the stack |
+| Node.js | The driver backend is Node; our webhook writer lives there | n/a, it's existing |
+| MongoDB | Shared database used by all their services | Postgres isn't an option mid-system |
+| Redis | Needed for rate limiting and retry state across workers | In-memory cache breaks with multiple workers |
+| Caddy | Their existing gateway, handles HTTPS automatically | Nginx, but they standardized on Caddy |
+| Docker Compose | Matches their single-server deployment | Kubernetes is overkill here |
+| GitHub + Actions | Our repo, issue board, and automated checks | GitLab, but team is on GitHub |
+| OpenAPI + Redoc | Auto-generated API docs for partners | Hand-written docs drift out of date |
 
 ## 2. Team Details
 
-**Team name:** _[FILL]_
+**Team name:** Keysmiths *(confirm or change)*
 
-**Members** — _[FILL for each member: full name · short bio (academic background + technical
-strengths) · GitHub username · role · headshot]_. Note the rubric: start with the team leader,
-**and every member must contribute to coding.**
+Work is split evenly across the four of us by area, and everyone writes code. We review each
+other's pull requests, so each person also touches parts outside their main area.
 
-| # | Full name | Bio (background + strengths) | GitHub | Role |
-|---|-----------|------------------------------|--------|------|
-| 1 (lead) | Nikhil Nathi | _[FILL bio]_ | @nikhilnathi2003 | Team Lead + Backend (keys/auth) |
-| 2 | _[FILL]_ | _[FILL]_ | _[@FILL]_ | _[FILL — e.g. Pricing/Booking]_ |
-| 3 | _[FILL]_ | _[FILL]_ | _[@FILL]_ | _[FILL — e.g. Webhooks/Outbox]_ |
-| 4 | _[FILL]_ | _[FILL]_ | _[@FILL]_ | _[FILL — e.g. Dashboard UI/Docs]_ |
+| Member | GitHub | Role / main area |
+|--------|--------|------------------|
+| Nikhil Goud Nathi (Team Lead) | @nikhilnathi2003 | API keys, authentication, project coordination |
+| Sujith Chitram | @sujithchitram24 | Price quotes and delivery booking |
+| Venkata Charan Sai Doniparthi | @charansai50 | Wallet payment and webhooks |
+| Sai Srinivas Uppara | @Lucky100704 | Tracking/cancellation, dashboard UI and docs |
 
-_(Headshots: insert each member's photo next to their row in the final document.)_
+*Bios (fill in one line each: academic background + technical strengths). Add a headshot next
+to each name in the final document.*
 
-**Contribution Plan.** Work is divided by the project's **pillars**, so each member owns a
-coherent slice end-to-end (design → code → tests) while pairing on shared pieces:
-- **Keys & Auth** (member 1) · **Pricing & Booking** (member 2) · **Webhooks & Outbox**
-  (member 3) · **Dashboard UI & Docs** (member 4). Safety rails (idempotency, rate limits,
-  tenant isolation) are shared and reviewed by all. Every PR is reviewed by at least one other
-  member, so everyone touches multiple areas. Our 102 GitHub issues are labeled by pillar so
-  ownership is visible and contribution is measurable.
-
----
+**Contribution plan.** Each person owns their area from design through code and tests. The
+shared pieces (rate limiting, retry protection, keeping one business's data separate from
+another's) are split between pairs and reviewed by everyone. Our GitHub issues are labelled by
+area, so it's easy to see who's doing what and that the load is even.
 
 ## 3. Team Agreements
 
-- **Primary Contact (with GA & instructor):** _[FILL — one member, likely the team lead]_
-- **Communication Tool:** **MS Teams** (channel *Business 3 - Group 6*), with our GA
-  **Rustem Izmailov** included in the chat.
-- **Project Management Tool:** **GitHub Projects + Issues.** We have already created a private
-  repo with **102 issues** (one per requirement), labeled by priority (MoSCoW), pillar, and
-  phase, grouped under 5 phase **milestones** with progress tracking.
-  Repo: `https://github.com/nikhilnathi2003/aerrand-developer-api`
-- **Contingency Planning:**
-  - *A member drops the course:* their open issues are redistributed by pillar at the next
-    sprint planning; we notify the GA immediately and adjust scope with the business if needed.
-  - *A member misses meetings/deadlines:* first a direct check-in; if it continues, the lead
-    raises it with the GA and we rebalance the board so delivery isn't blocked.
-  - *Academic dishonesty:* all work goes through reviewed PRs with traceable commit history; any
-    suspected plagiarism or AI-misuse is escalated to the GA, then the instructor. No code is
-    merged without attribution to its author.
-
----
+- **Primary contact:** Nikhil Goud Nathi (team lead). *(confirm)*
+- **Communication:** MS Teams, in the *Business 3 - Group 6* channel, with our GA Rustem
+  Izmailov in the chat.
+- **Project management:** GitHub Issues and a GitHub Projects board. We've already set up the
+  repo and created 102 issues (one per requirement), labelled by priority and area and grouped
+  into phase milestones, all on the board.
+- **Contingency planning:**
+  - If a member drops the course, we split their open issues among the rest at the next sprint
+    planning and tell the GA so scope can be adjusted.
+  - If someone keeps missing meetings or deadlines, we talk to them directly first; if it keeps
+    happening the lead raises it with the GA and we rebalance the board so work isn't blocked.
+  - For academic honesty, all work goes through reviewed pull requests with a clear commit
+    history, so each person's contribution is traceable. Anything suspicious gets raised with
+    the GA and then the instructor.
 
 ## 4. Kickoff Meeting Summary
 
-- **Business Contact:** **Johnpaul Sani** — Founder & CEO, Aerrand Technologies Inc.
-  (Mentor/GA: Rustem Izmailov.)
-- **Our Q&A** — _[FILL with the actual questions your group asked and the answers given.
-  Likely candidates from our analysis, confirm which you actually asked:]_
-  - _Do we get access to the existing `Aerrand_backen_infra` codebase, or build to spec? →_ **[answer]**
-  - _Is `STRIPE_SECRET_KEY_BUSINESS` moving to a live key before go-live? →_ **[answer]**
-  - _Can we get a sandbox business account + test wallet to develop against? →_ **[answer]**
-  - _Should API aerrands use channel `"api"` vs reusing `"business"`? →_ **[answer]**
-- **Other groups' questions (with answers):** _[FILL — list the useful ones you recorded]_
-- **Reflection:** _[FILL — 2–3 sentences. Draft to adapt:]_ Before the meeting we saw this as
-  "build an API." After it, we understand the real constraint is **integrating safely into a
-  live production system** — the hard parts are pricing integrity and delivering driver-side
-  events across two services, not the endpoints themselves. Our priorities shifted toward the
-  outbox design and server-side pricing first.
+**Business contact:** Johnpaul Sani, Founder and CEO, Aerrand Technologies Inc.
 
----
+**Questions our team asked** *(answers below are from the technical document Aerrand gave us;
+confirm they match what Johnpaul said in the meeting):*
 
-## 5. Sprint Plan (1 week = 1 sprint; first 4 sprints)
+- *(Nikhil)* Will we be working with your real system, or a separate sandbox with sample data?
+  **Answer:** We build against the real system, but there's a test mode with "test" keys that
+  create fake deliveries (no real driver, no real charge), so we can develop safely.
+- *(Nikhil)* Is there an existing wallet system we'd connect to, or should we build a simple
+  one? **Answer:** There's already a prepaid wallet for businesses; nothing uses it
+  automatically yet, so we connect our API to the existing wallet.
+- *(Nikhil)* How would partners receive their API keys, through a dashboard or issued manually
+  at first? **Answer:** Through a self-serve "Developers" section in the business dashboard,
+  where an approved business creates its own keys.
+- *(Teammate)* Should the new API be its own PostgreSQL service, or share the existing MongoDB?
+  **Answer:** Share the existing MongoDB; all new data lives in the same shared database.
 
-**User Stories**
-- As a **partner developer**, I want to **generate a scoped API key from the dashboard** so
-  that **my software can authenticate to Aerrand securely.**
-- As a **partner's system**, I want to **request a price quote for a route** so that **I know
-  the exact cost before booking.**
-- As a **partner's system**, I want to **create a delivery in one call and have it paid from
-  our wallet** so that **no human has to click "pay."**
-- As a **partner developer**, I want to **receive a webhook when the status changes** so that
-  **I don't have to poll for updates.**
-- As **Aerrand**, I want **every key hashed and instantly revocable** so that **a leaked key
-  causes zero damage.**
+**Useful questions from other groups:** *(fill in any you noted)*
 
-**Task Breakdown**
+**Reflection.** Going in, we thought of this mostly as "build some API endpoints." After the
+meeting it's clearer that the real challenge is fitting into a system that's already live and
+being careful not to break it. The parts that actually need thought are getting the price right
+on the server and getting driver updates out across two services, not the endpoints themselves.
+That changed what we plan to build first.
 
-| Sprint | Focus | Tasks (technical + non-technical) |
-|--------|-------|-----------------------------------|
-| **1** | Setup & foundations | Create repo/board (done); finalize this report; Docker Compose + Redis; new Django `developer` app skeleton; `GET /v1/health`; CI on GitHub Actions |
-| **2** | Keys & auth | `ApiKey` model (hashed + scoped); `ApiKeyAuthentication`; create/revoke/rotate endpoints; dashboard "Developers" section (keys only); unit tests |
-| **3** | Quotes & pricing | `POST /v1/quotes` reusing the pricing engine; route-km calc; quote persistence + expiry; validation errors; parity test vs dashboard estimate |
-| **4** | Booking & payment | `POST /v1/aerrands` (atomic, single + multi-stop); server-side price; atomic wallet debit; `GET /v1/aerrands/{id}` + tracking; idempotency key on create |
+## 5. Sprint Plan (one week = one sprint)
 
----
+**User stories**
+
+- As a partner developer, I want to create an API key from the dashboard so my software can
+  connect to Aerrand securely.
+- As a partner's system, I want to get a price quote for a route so I know the cost before
+  booking.
+- As a partner's system, I want to book a delivery in one call and have it paid from our wallet
+  so no one has to click "pay" by hand.
+- As a partner developer, I want to get a notification when the delivery status changes so I
+  don't have to keep checking.
+- As Aerrand, I want every key stored safely and revocable instantly so a leaked key does no
+  damage.
+
+**Task breakdown for the first four sprints**
+
+| Sprint | Focus | Tasks |
+|--------|-------|-------|
+| 1 | Setup | Finish this report; set up Docker + Redis; create the new API app skeleton; add a health check; turn on automated checks in GitHub |
+| 2 | Keys and login | Build the key model (stored as a hash); check keys on each request; create/revoke key endpoints; dashboard Developers section; write tests |
+| 3 | Quotes | Build the quote endpoint using the existing pricing logic; calculate route distance; save quotes with an expiry; add input validation |
+| 4 | Booking and payment | Build the create-delivery endpoint (single and multi-stop); pay from the wallet safely; add get/track endpoints; prevent duplicate bookings |
 
 ## 6. Other Details
 
-- **Risks & Assumptions:**
-  - *Risk:* we may not get the real codebase → *Mitigation:* build to the spec's interfaces so
-    our code can be lifted into Aerrand's monorepo later.
-  - *Risk:* the webhook outbox spans two services (Django + Node) → *Mitigation:* prototype it
-    early and cover it heavily with tests.
-  - *Risk:* pricing must match the dashboard to the cent → *Mitigation:* adopt Aerrand's parity
-    test as an acceptance gate.
-  - *Assumptions:* we have a test/sandbox business + wallet; Aerrand's existing pricing and
-    dispatch logic are stable and reusable; Redis can be added to the compose stack.
-- **Ethical Considerations:** The system handles **PII** (recipient names, phone numbers,
-  addresses) and **payment data**. We minimize exposure: PII is never written to logs or error
-  reports; **API keys are stored only as salted hashes**, never in plaintext; **webhook secrets
-  are encrypted at rest**; **strict tenant isolation** ensures one business can never see
-  another's deliveries; outbound webhooks have **SSRF protection**. Data handling follows
-  **PIPEDA** (Canadian privacy law) and the business's data-retention rules, and a business can
-  request deletion of its API logs.
-- **Additional Notes:** Repo `https://github.com/nikhilnathi2003/aerrand-developer-api`
-  (private — add the GA and instructor as collaborators). Full requirements backlog, architecture,
-  and rollout plan live in `/docs`.
+**Risks and assumptions.** The main risk is not getting access to Aerrand's real codebase, so
+we're building to the documented interfaces so our code can slot in later. The webhook part is
+risky because it spans two services, so we'll prototype it early and test it hard. Pricing has
+to match the dashboard exactly, so we'll use Aerrand's own comparison test as a check. We're
+assuming we'll get a test business account and wallet to develop against, and that the existing
+pricing and delivery logic is stable enough to reuse.
 
----
+**Ethical considerations.** The system handles personal information (names, phone numbers,
+addresses) and payment details. We keep that exposure low: personal info is never written to
+logs or error reports, API keys are only ever stored as a hash and never in plain text, webhook
+secrets are encrypted, and each business can only ever see its own deliveries. Outgoing webhook
+requests are checked so they can't be abused to reach internal addresses. Data handling follows
+Canadian privacy rules (PIPEDA) and the business's retention policy.
 
-### Team-name suggestions (pick one, delete the rest)
-**Keysmiths · Front Door · API Aerranders · Gatekeepers · The USB Port**
+**Links.**
+- Repo: https://github.com/nikhilnathi2003/aerrand-developer-api
+- Board: https://github.com/users/nikhilnathi2003/projects/2
