@@ -2,7 +2,7 @@
 
 **Course:** COMP 8967, University of Windsor, Fall 2026
 **Business:** Aerrand Technologies Inc. (Business 3) | **Group:** 6
-**Team name:** Aerrand API Team
+**Team name:** Aerrand Group-6
 
 > Draft note: keep the final submission to 3 pages. Lines marked *(fill in)* or *(confirm)*
 > need the team to check or add something.
@@ -87,7 +87,7 @@ we match their stack where it's sensible so the work could transfer later.
 
 ## 2. Team Details
 
-**Team name:** Aerrand API Team
+**Team name:** Aerrand Group-6
 
 Work is split evenly across the four of us by area, and everyone writes code. We review each
 other's pull requests, so each person also touches parts outside their main area.
@@ -150,8 +150,6 @@ area, so it's easy to see who's doing what and that the load is even.
 - *(Teammate)* Should the new API be its own PostgreSQL service, or share the existing MongoDB?
   **Answer:** He left this open. For our standalone build we'll use MongoDB (our own instance
   with mock data), since it's Aerrand's database and keeps our work transferable.
-
-**Useful questions from other groups:** *(fill in any you noted, or we can remove this line)*
 
 **Reflection.** Going in, we thought of this mostly as "build some API endpoints." After the
 meeting it's clearer that the focus for this phase is a safe, standalone build on mock data,
