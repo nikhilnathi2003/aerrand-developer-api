@@ -2,7 +2,7 @@
 
 **Course:** COMP 8967, University of Windsor, Fall 2026
 **Business:** Aerrand Technologies Inc. (Business 3) | **Group:** 6
-**Team name:** Keysmiths *(confirm or change)*
+**Team name:** Aerrand API Team
 
 > Draft note: keep the final submission to 3 pages. Lines marked *(fill in)* or *(confirm)*
 > need the team to check or add something.
@@ -87,7 +87,7 @@ we match their stack where it's sensible so the work could transfer later.
 
 ## 2. Team Details
 
-**Team name:** Keysmiths *(confirm or change)*
+**Team name:** Aerrand API Team
 
 Work is split evenly across the four of us by area, and everyone writes code. We review each
 other's pull requests, so each person also touches parts outside their main area.
@@ -99,8 +99,18 @@ other's pull requests, so each person also touches parts outside their main area
 | Venkata Charan Sai Doniparthi | @charansai50 | Simple wallet payment and webhooks |
 | Sai Srinivas Uppara | @Lucky100704 | Tracking/cancellation, developer docs, test mode |
 
-*Bios (fill in one line each: academic background + technical strengths). Add a headshot next
-to each name in the final document.*
+Short bios (edit anything that isn't accurate for you):
+
+- **Nikhil Goud Nathi** — Master of Applied Computing student; works on backend development and
+  application security, mainly with Python and Django.
+- **Sujith Chitram** — Master of Applied Computing student; works on backend and API
+  development with Python and databases.
+- **Venkata Charan Sai Doniparthi** — Master of Applied Computing student; interested in backend
+  services and payment/notification integrations, with Python and Node.js.
+- **Sai Srinivas Uppara** — Master of Applied Computing student; works on backend, testing and
+  documentation for REST APIs.
+
+*Add a headshot next to each name in the final document.*
 
 **Contribution plan.** Each person owns their area from design through code and tests. The
 shared pieces (rate limiting, retry protection, keeping one business's data separate from
