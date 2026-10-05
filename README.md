@@ -13,9 +13,26 @@
 
 ## Current phase
 
-**Proposal / approach phase.** This repository currently holds planning and design
-documents only. No application code is written yet. The first deliverable is our
-**approach proposal** (`docs/proposal.md`).
+**Building — Sprint 1 (foundations).** Planning is done; the backend scaffold is up.
+The API service runs with MongoDB + Redis via Docker, with a working `/v1/health` check.
+Next: the API key system, then quotes and booking (see `docs/api-contract.md`).
+
+## Running the project (Docker)
+
+You need **Docker Desktop** installed (free: https://www.docker.com/products/docker-desktop).
+Then, from the repo root:
+
+```bash
+docker compose up --build
+```
+
+This starts three containers — the Django API, MongoDB, and Redis. Once it's up, open:
+
+- http://localhost:8000/v1/health
+
+You should see `{"status": "ok", ..., "mongodb": "connected", "redis": "connected"}`.
+
+Stop it with `Ctrl+C` (or `docker compose down`).
 
 ## Links
 
@@ -31,12 +48,19 @@ documents only. No application code is written yet. The first deliverable is our
 aerrand-developer-api/
 ├── README.md               ← you are here
 ├── CONTRIBUTING.md         ← how our team works (branches, commits, reviews)
+├── docker-compose.yml      ← runs the API + MongoDB + Redis
+├── backend/                ← the Django API service
+│   ├── config/             ← Django project (settings, urls)
+│   ├── apiv1/              ← the /v1 API app (health check for now)
+│   ├── requirements.txt
+│   └── Dockerfile
 ├── docs/
-│   ├── proposal.md         ← our approach / pitch (first deliverable)
-│   ├── requirements.md     ← Aerrand's TRD turned into a MoSCoW backlog (→ GitHub issues)
-│   ├── architecture.md     ← the design in our own words
-│   ├── rollout-plan.md     ← Aerrand's 4-phase plan mapped to our board
-│   └── github-setup.md     ← how this org/repo/board is set up and how to add people
+│   ├── api-contract.md     ← the v1 request/response shapes we build to
+│   ├── P1-initial-setup-report.md
+│   ├── proposal.md · requirements.md · architecture.md · rollout-plan.md
+│   └── source/             ← original Aerrand PDFs (overview, TRD, API payloads)
+├── evidence/
+│   └── weekly-log.md       ← weekly progress & contribution log
 └── .gitignore
 ```
 
