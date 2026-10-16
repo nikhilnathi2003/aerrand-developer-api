@@ -1,7 +1,30 @@
 # Monday demo — key → quote → priced test-mode errand
 
 This is the Milestone 2 flow: a valid **test API key** creates a correctly-priced
-**test-mode errand**, live. Run these in order.
+**test-mode errand**, live.
+
+## Easiest: local, no Docker (already set up on this Mac)
+
+Two terminals, from the repo root:
+
+```bash
+# Terminal 1 — start the API (MongoDB + Redis + Django)
+./scripts/start-local.sh
+```
+```bash
+# Terminal 2 — run the whole demo (issue key → quote → create → get → safety)
+./scripts/demo.sh
+```
+
+`start-local.sh` starts MongoDB + Redis (Homebrew services), sets up the Python env, and
+runs the server at http://127.0.0.1:8000. `demo.sh` runs the full flow and prints each step.
+Run the tests any time with: `cd backend && ./.venv/bin/python manage.py test`.
+
+The manual Docker walkthrough below is the alternative (for teammates who use Docker).
+
+---
+
+## Docker alternative
 
 ## 0. Start the stack
 
