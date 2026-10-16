@@ -13,9 +13,14 @@
 
 ## Current phase
 
-**Building — Sprint 1 (foundations).** Planning is done; the backend scaffold is up.
-The API service runs with MongoDB + Redis via Docker, with a working `/v1/health` check.
-Next: the API key system, then quotes and booking (see `docs/api-contract.md`).
+**Building — Milestone 2 (core booking) works.** A test API key can get a priced quote
+and create a correctly-priced **test-mode errand**, with tenant isolation and scopes.
+See **`docs/demo.md`** for the live walkthrough.
+
+Working endpoints: `POST /v1/quotes`, `POST /v1/errands` (single + multi-stop),
+`GET /v1/errands/{id}`, `GET /v1/service-areas`, `GET /v1/health`.
+Keys are issued by command (`python manage.py issue_key …`), stored only as a hash.
+Next: wallet payment, tracking, cancel, then webhooks.
 
 ## Running the project (Docker)
 

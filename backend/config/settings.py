@@ -69,10 +69,24 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
 HST_RATE = 0.13
 CURRENCY = "CAD"
 
+# API key hashing. The pepper is a server-side secret mixed into every key hash,
+# so a database leak alone cannot verify keys. Generate once; keep it secret.
+API_KEY_HASH_PEPPER = os.environ.get("API_KEY_HASH_PEPPER", "dev-pepper-change-me")
+
+# Quotes expire after this many seconds.
+API_QUOTE_TTL_SECONDS = int(os.environ.get("API_QUOTE_TTL_SECONDS", "600"))
+
+# Service coverage (demo): Windsor, 20 km radius. Pickup/drop-offs must be inside.
+SERVICE_AREAS = [
+    {"slug": "windsor", "name": "Windsor", "province": "ON",
+     "lat": 42.3149, "lng": -83.0364, "radius_km": 20.0, "active": True},
+]
+
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_AUTHENTICATION_CLASSES": [],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
+    "EXCEPTION_HANDLER": "apiv1.handlers.custom_exception_handler",
 }
 
 AUTH_PASSWORD_VALIDATORS = []
