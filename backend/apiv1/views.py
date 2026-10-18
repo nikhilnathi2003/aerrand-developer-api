@@ -354,6 +354,22 @@ def create_test_key(request):
                      "scopes": ["create", "read", "cancel"]}, status=201)
 
 
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def revoke_test_key(request):
+    """Revoke a key from the dashboard (demo). Revocation is immediate and irreversible."""
+    prefix = (request.data or {}).get("prefix")
+    if not prefix:
+        return error_response("validation_failed", "prefix is required", 400)
+    result = db.api_keys().update_one(
+        {"key_prefix": prefix, "status": {"$ne": "revoked"}},
+        {"$set": {"status": "revoked", "revoked_at": _now()}},
+    )
+    if result.matched_count == 0:
+        return error_response("errand_not_found", "No active key with that prefix.", 404)
+    return Response({"status": "revoked", "prefix": prefix})
+
+
 def _list_errands(request):
     require_scope(request, "read")
     owner = request.user.business_owner_id

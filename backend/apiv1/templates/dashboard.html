@@ -34,6 +34,8 @@
          font-size:14px;font-weight:700;cursor:pointer;margin-top:16px;transition:background .15s}
   button:hover{background:var(--violet-d)}
   button:disabled{background:var(--lilac);cursor:not-allowed}
+  button.btn2{background:#fff;color:var(--violet);border:1px solid var(--violet)}
+  button.btn2:hover{background:var(--lilac-bg)}
   .result{margin-top:16px;background:var(--bg-alt);border:1px solid var(--line);border-radius:10px;padding:14px 16px;font-size:13.5px;display:none}
   .result.show{display:block}
   .kv{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--line)}
@@ -105,7 +107,7 @@
 <footer>Sandbox / mock data · Windsor service area · prices computed server-side, tax in (CAD).</footer>
 
 <script>
-let API_KEY = null, QUOTE_ID = null;
+let API_KEY = null, QUOTE_ID = null, KEY_PREFIX = null;
 const $ = id => document.getElementById(id);
 const money = n => "$" + Number(n).toFixed(2);
 function show(el, html){ el.innerHTML = html; el.classList.add("show"); }
@@ -124,12 +126,24 @@ async function genKey(){
   const r = await api("/v1/keys","POST",{business: $("business").value});
   $("btnKey").disabled = false;
   if(!r.ok){ return fail($("keyOut"), "Error "+r.status); }
-  API_KEY = r.data.key;
+  API_KEY = r.data.key; KEY_PREFIX = r.data.prefix;
   show($("keyOut"),
     '<div class="pill">test key · '+r.data.business+'</div>'+
     '<div class="mono" style="margin-top:9px">'+r.data.key+'</div>'+
-    '<div class="note">Scopes: '+r.data.scopes.join(", ")+'. Stored only as a hash — shown once.</div>');
+    '<div class="note">Scopes: '+r.data.scopes.join(", ")+'. Stored only as a hash — shown once.</div>'+
+    '<button class="btn2" onclick="revokeKey()">Revoke this key</button>'+
+    '<div id="revokeOut" class="note"></div>');
   $("btnQuote").disabled = false; $("btnList").disabled = false;
+}
+
+async function revokeKey(){
+  const rv = await api("/v1/keys/revoke","POST",{prefix: KEY_PREFIX});
+  if(!rv.ok){ $("revokeOut").innerHTML = '<span class="err">Could not revoke.</span>'; return; }
+  // prove it: the same key should now be rejected
+  const test = await api("/v1/quotes","POST",{pickup:{lat:"42.3149",lng:"-83.0364"},
+    stops:[{lat:"42.3201",lng:"-83.0187",parcels:{small:1}}]});
+  $("revokeOut").innerHTML = '<b style="color:var(--violet)">Key revoked.</b> A request with it now returns HTTP '
+    + test.status + ' ('+((test.data.error&&test.data.error.code)||'')+') — instant revocation, zero impact elsewhere.';
 }
 
 async function getQuote(){
