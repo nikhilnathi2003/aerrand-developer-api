@@ -20,5 +20,9 @@ fi
 
 ./.venv/bin/python manage.py migrate --noinput >/dev/null
 
-echo "API running at http://127.0.0.1:8000  (health: /v1/health).  Ctrl+C to stop."
+echo ""
+echo "  ➜  Open the dashboard:  http://127.0.0.1:8000/"
+echo "     (API health check:   http://127.0.0.1:8000/v1/health)"
+echo "     Ctrl+C to stop."
+echo ""
 exec ./.venv/bin/python manage.py runserver 127.0.0.1:8000
