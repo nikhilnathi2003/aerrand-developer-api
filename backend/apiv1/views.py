@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from django.conf import settings
+from django.shortcuts import render
 from rest_framework.decorators import (
     api_view,
     authentication_classes,
@@ -11,9 +12,11 @@ from rest_framework.decorators import (
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from . import db, pricing
+from . import db, keys, pricing
 from .authentication import ApiKeyAuthentication, require_scope
 from .errors import error_response
+
+_KEY_NS = uuid.UUID("a1b2c3d4-0000-4000-8000-000000000000")
 
 _CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no ambiguous chars
 
@@ -151,10 +154,17 @@ def quotes(request):
 # --------------------------------------------------------------------------- #
 # POST /v1/errands  — create a (test-mode) delivery, priced from the quote
 # --------------------------------------------------------------------------- #
-@api_view(["POST"])
+@api_view(["GET", "POST"])
 @authentication_classes([ApiKeyAuthentication])
 @permission_classes([IsAuthenticated])
-def create_errand(request):
+def errands_collection(request):
+    """GET lists the business's errands; POST creates one."""
+    if request.method == "GET":
+        return _list_errands(request)
+    return _create_errand(request)
+
+
+def _create_errand(request):
     require_scope(request, "create")
     body = request.data or {}
     owner = request.user.business_owner_id
@@ -307,3 +317,45 @@ def _batch_response(docs, breakdown, batch_id):
             for d in docs
         ],
     }
+
+
+# --------------------------------------------------------------------------- #
+# Developer dashboard (web UI) + helpers it needs
+# --------------------------------------------------------------------------- #
+def dashboard(request):
+    """Serve the developer dashboard page."""
+    return render(request, "dashboard.html")
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def create_test_key(request):
+    """Dashboard key creation — TEST keys only (live keys are issued by command)."""
+    body = request.data or {}
+    business = (body.get("business") or "Demo Business").strip()
+    owner_id = str(uuid.uuid5(_KEY_NS, business.lower()))
+    plaintext = keys.generate_key("test")
+    db.api_keys().insert_one({
+        "id": str(uuid.uuid4()),
+        "business_owner_id": owner_id,
+        "business_name": business,
+        "name": "dashboard",
+        "environment": "test",
+        "key_prefix": keys.prefix_of(plaintext),
+        "key_hash": keys.hash_key(plaintext),
+        "scopes": ["create", "read", "cancel"],
+        "status": "active",
+        "expires_at": None,
+        "created_at": _now(),
+        "last_used_at": None,
+    })
+    return Response({"key": plaintext, "prefix": keys.prefix_of(plaintext),
+                     "business": business, "environment": "test",
+                     "scopes": ["create", "read", "cancel"]}, status=201)
+
+
+def _list_errands(request):
+    require_scope(request, "read")
+    owner = request.user.business_owner_id
+    docs = list(db.errands().find({"business_owner_id": owner}).sort("created_at", -1).limit(20))
+    return Response({"errands": [_errand_response(d) for d in docs]})

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aerrand Developer API</title>
+<style>
+  :root{ --violet:#6d28d9; --violet-d:#5b21b6; --ink:#1e1b2e; --muted:#6b7280;
+         --line:#e6e3ef; --bg:#f6f5fb; --ok:#15803d; --card:#ffffff; }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+  header{background:linear-gradient(100deg,var(--violet),var(--violet-d));color:#fff;padding:22px 28px}
+  header h1{margin:0;font-size:20px;letter-spacing:.3px}
+  header p{margin:4px 0 0;opacity:.85;font-size:13px}
+  .wrap{max-width:900px;margin:22px auto;padding:0 16px;display:grid;gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;box-shadow:0 1px 2px rgba(20,10,40,.04)}
+  .card h2{margin:0 0 4px;font-size:15px}
+  .step{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--violet);color:#fff;font-size:12px;font-weight:700;margin-right:8px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+  label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+  input{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  button{background:var(--violet);color:#fff;border:0;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;margin-top:14px}
+  button:hover{background:var(--violet-d)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .result{margin-top:14px;background:#faf9ff;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:13px;display:none}
+  .result.show{display:block}
+  .kv{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed var(--line)}
+  .kv:last-child{border-bottom:0}
+  .kv b{font-variant-numeric:tabular-nums}
+  .total{font-size:17px;color:var(--violet-d);font-weight:800}
+  .pill{display:inline-block;background:#ede9fe;color:var(--violet-d);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700}
+  .mono{font-family:ui-monospace,Menlo,monospace;font-size:12px;word-break:break-all;background:#f1eefc;border-radius:6px;padding:8px 10px}
+  .err{color:#b91c1c}
+  .note{font-size:12px;color:var(--muted);margin-top:10px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Aerrand Developer API</h1>
+  <p>Business 3 · Group 6 — book verified deliveries from your own software</p>
+</header>
+
+<div class="wrap">
+
+  <!-- STEP 1 -->
+  <div class="card">
+    <h2><span class="step">1</span>Get an API key</h2>
+    <p class="sub">A partner is issued a key to authenticate. We store only a one-way hash — the key is shown once.</p>
+    <label>Business name</label>
+    <input id="business" value="Acme Co">
+    <button id="btnKey" onclick="genKey()">Generate test key</button>
+    <div class="result" id="keyOut"></div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="card">
+    <h2><span class="step">2</span>Get a price quote</h2>
+    <p class="sub">The <b>server</b> calculates the price — the caller can never send its own price.</p>
+    <label>Pickup (lat, lng)</label>
+    <div class="row"><input id="puLat" value="42.3149"><input id="puLng" value="-83.0364"></div>
+    <label>Drop-off (lat, lng)</label>
+    <div class="row"><input id="doLat" value="42.3201"><input id="doLng" value="-83.0187"></div>
+    <label>Parcels (small, medium, large)</label>
+    <div class="row3"><input id="pSmall" value="2"><input id="pMedium" value="1"><input id="pLarge" value="0"></div>
+    <button id="btnQuote" onclick="getQuote()" disabled>Get quote</button>
+    <div class="result" id="quoteOut"></div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="card">
+    <h2><span class="step">3</span>Create the delivery</h2>
+    <p class="sub">Create a <b>test-mode</b> delivery, priced from the quote above.</p>
+    <label>Recipient name</label>
+    <input id="rName" value="Jordan Alvarez">
+    <label>Recipient phone</label>
+    <input id="rPhone" value="+15195550188">
+    <button id="btnCreate" onclick="createErrand()" disabled>Create delivery</button>
+    <div class="result" id="errandOut"></div>
+  </div>
+
+  <!-- LIST -->
+  <div class="card">
+    <h2>Your deliveries</h2>
+    <p class="sub">Only this business can see its own deliveries (tenant isolation).</p>
+    <button onclick="loadErrands()" id="btnList" disabled>Refresh</button>
+    <div class="result" id="listOut"></div>
+  </div>
+
+</div>
+
+<script>
+let API_KEY = null, QUOTE_ID = null;
+const $ = id => document.getElementById(id);
+const money = n => "$" + Number(n).toFixed(2);
+
+function show(el, html){ el.innerHTML = html; el.classList.add("show"); }
+function fail(el, msg){ show(el, '<span class="err">'+msg+'</span>'); }
+
+async function api(path, method, body){
+  const headers = {"Content-Type":"application/json"};
+  if(API_KEY) headers["Authorization"] = "Bearer " + API_KEY;
+  const r = await fetch(path, {method, headers, body: body?JSON.stringify(body):undefined});
+  const data = await r.json().catch(()=>({}));
+  return {ok:r.ok, status:r.status, data};
+}
+
+async function genKey(){
+  $("btnKey").disabled = true;
+  const r = await api("/v1/keys","POST",{business: $("business").value});
+  $("btnKey").disabled = false;
+  if(!r.ok){ return fail($("keyOut"), "Error "+r.status); }
+  API_KEY = r.data.key;
+  show($("keyOut"),
+    '<div class="pill">test key for '+r.data.business+'</div>'+
+    '<div class="mono" style="margin-top:8px">'+r.data.key+'</div>'+
+    '<div class="note">Scopes: '+r.data.scopes.join(", ")+'. Stored only as a hash — shown once.</div>');
+  $("btnQuote").disabled = false; $("btnList").disabled = false;
+}
+
+async function getQuote(){
+  const stop = {lat:$("doLat").value, lng:$("doLng").value,
+    parcels:{small:+$("pSmall").value||0, medium:+$("pMedium").value||0, large:+$("pLarge").value||0}};
+  const r = await api("/v1/quotes","POST",{pickup:{lat:$("puLat").value, lng:$("puLng").value}, stops:[stop]});
+  if(!r.ok){ return fail($("quoteOut"), (r.data.error&&r.data.error.message)||("Error "+r.status)); }
+  QUOTE_ID = r.data.quote_id;
+  const d = r.data;
+  show($("quoteOut"),
+    kv("Base (stops)", money(d.dropBaseTotal))+
+    kv("Distance ("+d.routeKm+" km)", money(d.distanceCharge))+
+    kv("Parcel size add-ons", money(d.sizeAddOnTotal))+
+    kv("Pre-tax", money(d.routePrice))+
+    kv("HST (13%)", money(d.hst))+
+    '<div class="kv"><span>Total</span><b class="total">'+money(d.chargeTotal)+'</b></div>'+
+    '<div class="note">Recommended vehicle: '+d.recommendedVehicle+' · quote '+d.quote_id+'</div>');
+  $("btnCreate").disabled = false;
+}
+
+async function createErrand(){
+  const body = {quote_id: QUOTE_ID,
+    pickup:{lat:$("puLat").value, lng:$("puLng").value},
+    dropoff:{lat:$("doLat").value, lng:$("doLng").value,
+      contact:{name:$("rName").value, phone_number:$("rPhone").value}, preference:"leave_at_door"}};
+  const r = await api("/v1/errands","POST",body);
+  if(!r.ok){ return fail($("errandOut"), (r.data.error&&r.data.error.message)||("Error "+r.status)); }
+  const e = r.data;
+  show($("errandOut"),
+    '<div class="pill">'+(e.test_mode?"TEST · ":"")+e.status+'</div>'+
+    kv("Errand ID", '<span class="mono">'+e.errand_id+'</span>')+
+    kv("Handover code", "<b>"+e.delivery_code+"</b>")+
+    kv("Vehicle", e.vehicle_type)+
+    kv("Price", "<b>"+money(e.pricing.charge_total)+"</b>"));
+  loadErrands();
+}
+
+async function loadErrands(){
+  const r = await api("/v1/errands","GET");
+  if(!r.ok){ return fail($("listOut"), "Error "+r.status); }
+  const rows = (r.data.errands||[]).map(e =>
+    kv((e.test_mode?"TEST ":"")+e.delivery_code+" · "+e.status, money(e.pricing.charge_total))).join("");
+  show($("listOut"), rows || "<span class='note'>No deliveries yet.</span>");
+}
+
+function kv(k,v){ return '<div class="kv"><span>'+k+'</span><b>'+v+'</b></div>'; }
+</script>
+</body>
+</html>
