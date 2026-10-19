@@ -89,7 +89,7 @@ authenticated by a hashed API key, and safe to expose to the public internet.
 | Name | GitHub | Role |
 |------|--------|------|
 | Nikhil Nathi | @nikhilnathi2003 | _tbd_ |
-| _teammate_ | _@handle_ | _tbd_ |
+| Sai Srinivas Uppara | @lucky100704 | _tbd_ |
 | _teammate_ | _@handle_ | _tbd_ |
 | _teammate_ | _@handle_ | _tbd_ |
 
