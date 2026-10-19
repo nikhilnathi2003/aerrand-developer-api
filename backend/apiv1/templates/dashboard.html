@@ -3,35 +3,54 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>aerrand · Developer API</title>
+<title>aerrand · Developer Console</title>
 <style>
-  /* Aerrand brand palette (from aerrand.com) */
   :root{
     --violet:#5202d9; --violet-d:#4201ad; --lilac:#ccaaff; --lilac-bg:#f4eefe;
-    --ink:#0a0a0c; --ink-2:#1a1a1a; --muted:#6b6b6b; --line:rgba(10,10,12,.12);
-    --bg:#ffffff; --bg-alt:#f9f9f9; --ok:#15803d; --err:#b91c1c;
+    --ink:#0a0a0c; --ink-2:#1a1a1a; --muted:#6b6b6b; --line:rgba(10,10,12,.1);
+    --bg:#ffffff; --bg-alt:#f9f9f9; --ok:#15803d; --okbg:#eaf7ee; --err:#b91c1c;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
        font-family:-apple-system,"Segoe UI",Inter,Roboto,Arial,sans-serif;line-height:1.5}
-  header{display:flex;align-items:baseline;gap:14px;padding:22px 28px;border-bottom:1px solid var(--line)}
-  .brand{font-size:26px;font-weight:800;letter-spacing:-.5px;color:var(--violet)}
-  .tag{font-size:13px;color:var(--muted)}
-  .loc{margin-left:auto;font-size:12px;color:var(--violet);background:var(--lilac-bg);
-       border:1px solid var(--lilac);border-radius:20px;padding:4px 12px;font-weight:600}
-  .wrap{max-width:860px;margin:26px auto;padding:0 18px;display:grid;gap:16px}
-  .card{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+  a{color:var(--violet);text-decoration:none}
+
+  /* nav */
+  nav{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:16px;
+      padding:14px 28px;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  .brand{font-size:23px;font-weight:800;letter-spacing:-.5px;color:var(--violet)}
+  .vdiv{width:1px;height:20px;background:var(--line)}
+  .nav-tag{font-size:13px;color:var(--muted);font-weight:600}
+  .nav-right{margin-left:auto;display:flex;align-items:center;gap:20px;font-size:14px}
+  .nav-right a{color:var(--ink-2);font-weight:500}
+  .loc{font-size:12px;color:var(--violet);background:var(--lilac-bg);border:1px solid var(--lilac);
+       border-radius:20px;padding:4px 12px;font-weight:700}
+
+  /* hero */
+  .hero{background:linear-gradient(180deg,var(--lilac-bg),#fff);border-bottom:1px solid var(--line);padding:38px 28px 30px}
+  .hero-inner{max-width:1040px;margin:0 auto}
+  .hero h1{margin:0 0 6px;font-size:30px;letter-spacing:-.8px}
+  .hero p{margin:0 0 22px;color:var(--muted);font-size:15px;max-width:620px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .stat .lbl{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+  .stat .val{font-size:22px;font-weight:800;margin-top:6px;letter-spacing:-.5px}
+  .stat svg{width:15px;height:15px;color:var(--violet)}
+
+  /* layout */
+  main{max-width:1040px;margin:26px auto;padding:0 20px}
+  .grid{display:grid;grid-template-columns:1.35fr 1fr;gap:20px;align-items:start}
+  .section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:4px 0 12px}
+  .card{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:16px}
   .card h2{margin:0 0 3px;font-size:16px;display:flex;align-items:center;gap:10px}
-  .step{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;
-        border-radius:50%;background:var(--violet);color:#fff;font-size:12px;font-weight:700}
+  .step{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--violet);color:#fff;font-size:12px;font-weight:700}
   .sub{color:var(--muted);font-size:13.5px;margin:0 0 14px}
-  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+  label{display:block;font-size:11px;color:var(--muted);margin:10px 0 4px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
   input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;color:var(--ink)}
   input:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px var(--lilac-bg)}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-  button{background:var(--violet);color:#fff;border:0;border-radius:10px;padding:11px 18px;
-         font-size:14px;font-weight:700;cursor:pointer;margin-top:16px;transition:background .15s}
+  button{background:var(--violet);color:#fff;border:0;border-radius:10px;padding:11px 18px;font-size:14px;font-weight:700;cursor:pointer;margin-top:16px;transition:background .15s}
   button:hover{background:var(--violet-d)}
   button:disabled{background:var(--lilac);cursor:not-allowed}
   button.btn2{background:#fff;color:var(--violet);border:1px solid var(--violet)}
@@ -43,68 +62,148 @@
   .kv b{font-variant-numeric:tabular-nums}
   .total{font-size:18px;color:var(--violet);font-weight:800}
   .pill{display:inline-block;background:var(--violet);color:#fff;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700;letter-spacing:.3px}
-  .mono{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;word-break:break-all;
-        background:var(--lilac-bg);border:1px solid var(--lilac);border-radius:8px;padding:9px 11px;color:var(--violet-d)}
+  .pill.ok{background:var(--okbg);color:var(--ok)}
+  .mono{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;word-break:break-all;background:var(--lilac-bg);border:1px solid var(--lilac);border-radius:8px;padding:9px 11px;color:var(--violet-d)}
   .note{font-size:12px;color:var(--muted);margin-top:10px}
   .err{color:var(--err)}
-  footer{max-width:860px;margin:10px auto 40px;padding:0 18px;color:var(--muted);font-size:12px}
+
+  /* deliveries table */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)}
+  td{padding:9px 10px;border-bottom:1px solid var(--line)}
+  tr:last-child td{border-bottom:0}
+  .badge{font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;background:var(--lilac-bg);color:var(--violet-d)}
+  .empty{color:var(--muted);font-size:13px;padding:14px 4px}
+
+  /* method badges */
+  .m{font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:700;border-radius:5px;padding:2px 7px}
+  .m.post{background:var(--lilac-bg);color:var(--violet-d)}
+  .m.get{background:#eef6ee;color:var(--ok)}
+
+  footer{max-width:1040px;margin:18px auto 50px;padding:0 20px;color:var(--muted);font-size:12px}
+  @media(max-width:820px){ .grid{grid-template-columns:1fr} .stats{grid-template-columns:1fr 1fr} .nav-right a{display:none} }
 </style>
 </head>
 <body>
-<header>
+
+<nav>
   <span class="brand">aerrand</span>
-  <span class="tag">Developer API — Business 3 · Group 6</span>
-  <span class="loc">Windsor, ON · sandbox</span>
-</header>
+  <span class="vdiv"></span>
+  <span class="nav-tag">Developer Console</span>
+  <span class="nav-right">
+    <a href="#console">Console</a>
+    <a href="#reference">API Reference</a>
+    <span class="loc">● Windsor, ON · Sandbox</span>
+  </span>
+</nav>
 
-<div class="wrap">
+<section class="hero">
+  <div class="hero-inner">
+    <h1>Developer Console</h1>
+    <p>Book verified Aerrand deliveries from your own software — issue a key, price a route server-side, and create a delivery in three calls. This is a live sandbox on test data.</p>
+    <div class="stats">
+      <div class="stat">
+        <div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h18"/></svg> Deliveries</div>
+        <div class="val" id="sDeliveries">0</div>
+      </div>
+      <div class="stat">
+        <div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Total booked</div>
+        <div class="val" id="sValue">$0.00</div>
+      </div>
+      <div class="stat">
+        <div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 20 3m-5 0h5v5"/></svg> API key</div>
+        <div class="val" id="sKey" style="font-size:15px">none</div>
+      </div>
+      <div class="stat">
+        <div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg> Service area</div>
+        <div class="val" style="font-size:17px">Windsor, ON</div>
+      </div>
+    </div>
+  </div>
+</section>
 
-  <!-- STEP 1 -->
-  <div class="card">
-    <h2><span class="step">1</span> Get an API key</h2>
-    <p class="sub">A partner is issued a key to authenticate. We store only a one-way hash — the key is shown once and can be revoked instantly.</p>
-    <label>Business name</label>
-    <input id="business" value="Acme Co">
-    <button id="btnKey" onclick="genKey()">Generate test key</button>
-    <div class="result" id="keyOut"></div>
+<main id="console">
+  <div class="grid">
+    <!-- LEFT: flow -->
+    <div>
+      <div class="section-title">Create a delivery</div>
+
+      <div class="card">
+        <h2><span class="step">1</span> Get an API key</h2>
+        <p class="sub">A partner is issued a key to authenticate. We store only a one-way hash — shown once, revocable instantly.</p>
+        <label>Business name</label>
+        <input id="business" value="Acme Co">
+        <button id="btnKey" onclick="genKey()">Generate test key</button>
+        <div class="result" id="keyOut"></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="step">2</span> Get a price quote</h2>
+        <p class="sub">The <b>server</b> calculates the price — the caller can never send its own. Addresses must be inside a served city.</p>
+        <label>Pickup (lat, lng)</label>
+        <div class="row"><input id="puLat" value="42.3149"><input id="puLng" value="-83.0364"></div>
+        <label>Drop-off (lat, lng)</label>
+        <div class="row"><input id="doLat" value="42.3201"><input id="doLng" value="-83.0187"></div>
+        <label>Parcels — small, medium, large</label>
+        <div class="row3"><input id="pSmall" value="2"><input id="pMedium" value="1"><input id="pLarge" value="0"></div>
+        <button id="btnQuote" onclick="getQuote()" disabled>Get quote</button>
+        <div class="result" id="quoteOut"></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="step">3</span> Create the delivery</h2>
+        <p class="sub">Create a <b>test-mode</b> delivery, priced from the quote above. Returns an errand id and a handover code.</p>
+        <label>Recipient name</label>
+        <input id="rName" value="Jordan Alvarez">
+        <label>Recipient phone</label>
+        <input id="rPhone" value="+15195550188">
+        <button id="btnCreate" onclick="createErrand()" disabled>Create delivery</button>
+        <div class="result" id="errandOut"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: deliveries -->
+    <div>
+      <div class="section-title">Your deliveries</div>
+      <div class="card" style="padding:14px 10px">
+        <table>
+          <thead><tr><th>Code</th><th>Status</th><th>Vehicle</th><th style="text-align:right">Price</th></tr></thead>
+          <tbody id="deliveryRows"><tr><td colspan="4" class="empty">No deliveries yet — create one on the left.</td></tr></tbody>
+        </table>
+        <div style="padding:10px 10px 2px"><button class="btn2" id="btnList" onclick="loadErrands()" disabled style="margin-top:0">Refresh</button></div>
+      </div>
+      <div class="section-title" style="margin-top:22px">Why it's safe</div>
+      <div class="card" style="font-size:13.5px;color:var(--ink-2)">
+        <div class="kv"><span>Price tampering</span><b class="pill ok">blocked</b></div>
+        <div class="kv"><span>Keys in plaintext</span><b class="pill ok">never</b></div>
+        <div class="kv"><span>Cross-business access</span><b class="pill ok">isolated</b></div>
+        <div class="kv"><span>Leaked key</span><b class="pill ok">revoke instantly</b></div>
+      </div>
+    </div>
   </div>
 
-  <!-- STEP 2 -->
-  <div class="card">
-    <h2><span class="step">2</span> Get a price quote</h2>
-    <p class="sub">The <b>server</b> calculates the price — the caller can never send its own. Addresses must be inside a served city.</p>
-    <label>Pickup (lat, lng)</label>
-    <div class="row"><input id="puLat" value="42.3149"><input id="puLng" value="-83.0364"></div>
-    <label>Drop-off (lat, lng)</label>
-    <div class="row"><input id="doLat" value="42.3201"><input id="doLng" value="-83.0187"></div>
-    <label>Parcels — small, medium, large</label>
-    <div class="row3"><input id="pSmall" value="2"><input id="pMedium" value="1"><input id="pLarge" value="0"></div>
-    <button id="btnQuote" onclick="getQuote()" disabled>Get quote</button>
-    <div class="result" id="quoteOut"></div>
+  <!-- API REFERENCE -->
+  <div id="reference" style="margin-top:14px">
+    <div class="section-title">API Reference</div>
+    <div class="card" style="padding:8px 10px">
+      <table>
+        <thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0;padding:9px 10px">/v1/keys</td><td>Issue a test API key</td></tr>
+          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0;padding:9px 10px">/v1/keys/revoke</td><td>Revoke a key instantly</td></tr>
+          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0;padding:9px 10px">/v1/quotes</td><td>Price a route (server-computed)</td></tr>
+          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0;padding:9px 10px">/v1/errands</td><td>Create a delivery (single or multi-stop)</td></tr>
+          <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0;padding:9px 10px">/v1/errands/{id}</td><td>Retrieve a delivery</td></tr>
+          <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0;padding:9px 10px">/v1/errands</td><td>List your deliveries</td></tr>
+          <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0;padding:9px 10px">/v1/service-areas</td><td>Service coverage</td></tr>
+          <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0;padding:9px 10px">/v1/health</td><td>Health check</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
+</main>
 
-  <!-- STEP 3 -->
-  <div class="card">
-    <h2><span class="step">3</span> Create the delivery</h2>
-    <p class="sub">Create a <b>test-mode</b> delivery, priced from the quote above. Returns an errand id and a handover code.</p>
-    <label>Recipient name</label>
-    <input id="rName" value="Jordan Alvarez">
-    <label>Recipient phone</label>
-    <input id="rPhone" value="+15195550188">
-    <button id="btnCreate" onclick="createErrand()" disabled>Create delivery</button>
-    <div class="result" id="errandOut"></div>
-  </div>
-
-  <!-- LIST -->
-  <div class="card">
-    <h2>Your deliveries</h2>
-    <p class="sub">Only this business can see its own deliveries — one business can never read another's (tenant isolation).</p>
-    <button onclick="loadErrands()" id="btnList" disabled>Refresh</button>
-    <div class="result" id="listOut"></div>
-  </div>
-
-</div>
-<footer>Sandbox / mock data · Windsor service area · prices computed server-side, tax in (CAD).</footer>
+<footer>Sandbox / mock data · Windsor service area · prices computed server-side, tax in (CAD) · Business 3 · Group 6</footer>
 
 <script>
 let API_KEY = null, QUOTE_ID = null, KEY_PREFIX = null;
@@ -127,6 +226,7 @@ async function genKey(){
   $("btnKey").disabled = false;
   if(!r.ok){ return fail($("keyOut"), "Error "+r.status); }
   API_KEY = r.data.key; KEY_PREFIX = r.data.prefix;
+  $("sKey").textContent = "active"; $("sKey").style.color = "var(--ok)";
   show($("keyOut"),
     '<div class="pill">test key · '+r.data.business+'</div>'+
     '<div class="mono" style="margin-top:9px">'+r.data.key+'</div>'+
@@ -139,11 +239,11 @@ async function genKey(){
 async function revokeKey(){
   const rv = await api("/v1/keys/revoke","POST",{prefix: KEY_PREFIX});
   if(!rv.ok){ $("revokeOut").innerHTML = '<span class="err">Could not revoke.</span>'; return; }
-  // prove it: the same key should now be rejected
   const test = await api("/v1/quotes","POST",{pickup:{lat:"42.3149",lng:"-83.0364"},
     stops:[{lat:"42.3201",lng:"-83.0187",parcels:{small:1}}]});
+  $("sKey").textContent = "revoked"; $("sKey").style.color = "var(--err)";
   $("revokeOut").innerHTML = '<b style="color:var(--violet)">Key revoked.</b> A request with it now returns HTTP '
-    + test.status + ' ('+((test.data.error&&test.data.error.code)||'')+') — instant revocation, zero impact elsewhere.';
+    + test.status + ' ('+((test.data.error&&test.data.error.code)||'')+') — instant, zero impact elsewhere.';
 }
 
 async function getQuote(){
@@ -182,10 +282,16 @@ async function createErrand(){
 
 async function loadErrands(){
   const r = await api("/v1/errands","GET");
-  if(!r.ok){ return fail($("listOut"), "Error "+r.status); }
-  const rows = (r.data.errands||[]).map(e =>
-    kv((e.test_mode?"TEST ":"")+e.delivery_code+" · "+e.status, money(e.pricing.charge_total))).join("");
-  show($("listOut"), rows || "<span class='note'>No deliveries yet.</span>");
+  if(!r.ok){ return; }
+  const list = r.data.errands || [];
+  $("sDeliveries").textContent = list.length;
+  const total = list.reduce((s,e)=>s + Number(e.pricing.charge_total), 0);
+  $("sValue").textContent = money(total);
+  if(!list.length){ $("deliveryRows").innerHTML = '<tr><td colspan="4" class="empty">No deliveries yet — create one on the left.</td></tr>'; return; }
+  $("deliveryRows").innerHTML = list.map(e =>
+    '<tr><td><b>'+e.delivery_code+'</b> '+(e.test_mode?'<span class="badge">TEST</span>':'')+'</td>'+
+    '<td>'+e.status+'</td><td>'+e.vehicle_type+'</td>'+
+    '<td style="text-align:right">'+money(e.pricing.charge_total)+'</td></tr>').join("");
 }
 function kv(k,v){ return '<div class="kv"><span>'+k+'</span><b>'+v+'</b></div>'; }
 </script>
