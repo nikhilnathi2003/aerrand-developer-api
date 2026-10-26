@@ -11,34 +11,24 @@
     --bg:#ffffff; --bg-alt:#f9f9f9; --ok:#15803d; --okbg:#eaf7ee; --err:#b91c1c;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);
-       font-family:-apple-system,"Segoe UI",Inter,Roboto,Arial,sans-serif;line-height:1.5}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Segoe UI",Inter,Roboto,Arial,sans-serif;line-height:1.5}
   a{color:var(--violet);text-decoration:none}
-
-  /* nav */
-  nav{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:16px;
-      padding:14px 28px;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:16px;padding:14px 28px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
   .brand{font-size:23px;font-weight:800;letter-spacing:-.5px;color:var(--violet)}
   .vdiv{width:1px;height:20px;background:var(--line)}
   .nav-tag{font-size:13px;color:var(--muted);font-weight:600}
   .nav-right{margin-left:auto;display:flex;align-items:center;gap:20px;font-size:14px}
   .nav-right a{color:var(--ink-2);font-weight:500}
-  .loc{font-size:12px;color:var(--violet);background:var(--lilac-bg);border:1px solid var(--lilac);
-       border-radius:20px;padding:4px 12px;font-weight:700}
-
-  /* hero */
-  .hero{background:linear-gradient(180deg,var(--lilac-bg),#fff);border-bottom:1px solid var(--line);padding:38px 28px 30px}
+  .loc{font-size:12px;color:var(--violet);background:var(--lilac-bg);border:1px solid var(--lilac);border-radius:20px;padding:4px 12px;font-weight:700}
+  .hero{background:linear-gradient(180deg,var(--lilac-bg),#fff);border-bottom:1px solid var(--line);padding:34px 28px 28px}
   .hero-inner{max-width:1040px;margin:0 auto}
-  .hero h1{margin:0 0 6px;font-size:30px;letter-spacing:-.8px}
-  .hero p{margin:0 0 22px;color:var(--muted);font-size:15px;max-width:620px}
+  .hero h1{margin:0 0 6px;font-size:28px;letter-spacing:-.8px}
+  .hero p{margin:0 0 20px;color:var(--muted);font-size:15px;max-width:640px}
   .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-  .stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px}
-  .stat .lbl{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
-  .stat .val{font-size:22px;font-weight:800;margin-top:6px;letter-spacing:-.5px}
-  .stat svg{width:15px;height:15px;color:var(--violet)}
-
-  /* layout */
-  main{max-width:1040px;margin:26px auto;padding:0 20px}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px 16px}
+  .stat .lbl{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+  .stat .val{font-size:22px;font-weight:800;margin-top:5px;letter-spacing:-.5px}
+  main{max-width:1040px;margin:24px auto;padding:0 20px}
   .grid{display:grid;grid-template-columns:1.35fr 1fr;gap:20px;align-items:start}
   .section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:4px 0 12px}
   .card{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:16px}
@@ -50,36 +40,30 @@
   input:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px var(--lilac-bg)}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-  button{background:var(--violet);color:#fff;border:0;border-radius:10px;padding:11px 18px;font-size:14px;font-weight:700;cursor:pointer;margin-top:16px;transition:background .15s}
+  button{background:var(--violet);color:#fff;border:0;border-radius:10px;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer;margin-top:14px;margin-right:8px;transition:background .15s}
   button:hover{background:var(--violet-d)}
   button:disabled{background:var(--lilac);cursor:not-allowed}
   button.btn2{background:#fff;color:var(--violet);border:1px solid var(--violet)}
   button.btn2:hover{background:var(--lilac-bg)}
-  .result{margin-top:16px;background:var(--bg-alt);border:1px solid var(--line);border-radius:10px;padding:14px 16px;font-size:13.5px;display:none}
+  button.sm{padding:6px 11px;font-size:12.5px;margin-top:8px}
+  .result{margin-top:14px;background:var(--bg-alt);border:1px solid var(--line);border-radius:10px;padding:14px 16px;font-size:13.5px;display:none}
   .result.show{display:block}
   .kv{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--line)}
   .kv:last-child{border-bottom:0}
-  .kv b{font-variant-numeric:tabular-nums}
   .total{font-size:18px;color:var(--violet);font-weight:800}
-  .pill{display:inline-block;background:var(--violet);color:#fff;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700;letter-spacing:.3px}
+  .pill{display:inline-block;background:var(--violet);color:#fff;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700}
   .pill.ok{background:var(--okbg);color:var(--ok)}
   .mono{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;word-break:break-all;background:var(--lilac-bg);border:1px solid var(--lilac);border-radius:8px;padding:9px 11px;color:var(--violet-d)}
   .note{font-size:12px;color:var(--muted);margin-top:10px}
   .err{color:var(--err)}
-
-  /* deliveries table */
   table{width:100%;border-collapse:collapse;font-size:13px}
-  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)}
-  td{padding:9px 10px;border-bottom:1px solid var(--line)}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);padding:7px 9px;border-bottom:1px solid var(--line)}
+  td{padding:8px 9px;border-bottom:1px solid var(--line)}
   tr:last-child td{border-bottom:0}
   .badge{font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;background:var(--lilac-bg);color:var(--violet-d)}
   .empty{color:var(--muted);font-size:13px;padding:14px 4px}
-
-  /* method badges */
   .m{font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:700;border-radius:5px;padding:2px 7px}
-  .m.post{background:var(--lilac-bg);color:var(--violet-d)}
-  .m.get{background:#eef6ee;color:var(--ok)}
-
+  .m.post{background:var(--lilac-bg);color:var(--violet-d)} .m.get{background:#eef6ee;color:var(--ok)}
   footer{max-width:1040px;margin:18px auto 50px;padding:0 20px;color:var(--muted);font-size:12px}
   @media(max-width:820px){ .grid{grid-template-columns:1fr} .stats{grid-template-columns:1fr 1fr} .nav-right a{display:none} }
 </style>
@@ -87,213 +71,236 @@
 <body>
 
 <nav>
-  <span class="brand">aerrand</span>
-  <span class="vdiv"></span>
+  <span class="brand">aerrand</span><span class="vdiv"></span>
   <span class="nav-tag">Developer Console</span>
-  <span class="nav-right">
-    <a href="#console">Console</a>
-    <a href="#reference">API Reference</a>
-    <span class="loc">● Windsor, ON · Sandbox</span>
-  </span>
+  <span class="nav-right"><a href="#console">Console</a><a href="#reference">API Reference</a>
+    <span class="loc">● Windsor, ON · Sandbox</span></span>
 </nav>
 
-<section class="hero">
-  <div class="hero-inner">
-    <h1>Developer Console</h1>
-    <p>Book verified Aerrand deliveries from your own software — issue a key, price a route server-side, and create a delivery in three calls. This is a live sandbox on test data.</p>
-    <div class="stats">
-      <div class="stat">
-        <div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h18"/></svg> Deliveries</div>
-        <div class="val" id="sDeliveries">0</div>
-      </div>
-      <div class="stat">
-        <div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Total booked</div>
-        <div class="val" id="sValue">$0.00</div>
-      </div>
-      <div class="stat">
-        <div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 20 3m-5 0h5v5"/></svg> API key</div>
-        <div class="val" id="sKey" style="font-size:15px">none</div>
-      </div>
-      <div class="stat">
-        <div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg> Service area</div>
-        <div class="val" style="font-size:17px">Windsor, ON</div>
-      </div>
-    </div>
+<section class="hero"><div class="hero-inner">
+  <h1>Developer Console</h1>
+  <p>Issue a key, price a route server-side, pay from the wallet, and track or cancel a delivery — all on test data.</p>
+  <div class="stats">
+    <div class="stat"><div class="lbl">Deliveries</div><div class="val" id="sDeliveries">0</div></div>
+    <div class="stat"><div class="lbl">Total booked</div><div class="val" id="sValue">$0.00</div></div>
+    <div class="stat"><div class="lbl">Wallet balance</div><div class="val" id="sWallet">—</div></div>
+    <div class="stat"><div class="lbl">API key</div><div class="val" id="sKey" style="font-size:15px">none</div></div>
   </div>
-</section>
+</div></section>
 
-<main id="console">
-  <div class="grid">
-    <!-- LEFT: flow -->
-    <div>
-      <div class="section-title">Create a delivery</div>
+<main id="console"><div class="grid">
+  <!-- LEFT -->
+  <div>
+    <div class="section-title">Create a delivery</div>
 
-      <div class="card">
-        <h2><span class="step">1</span> Get an API key</h2>
-        <p class="sub">A partner is issued a key to authenticate. We store only a one-way hash — shown once, revocable instantly.</p>
-        <label>Business name</label>
-        <input id="business" value="Acme Co">
-        <button id="btnKey" onclick="genKey()">Generate test key</button>
-        <div class="result" id="keyOut"></div>
-      </div>
-
-      <div class="card">
-        <h2><span class="step">2</span> Get a price quote</h2>
-        <p class="sub">The <b>server</b> calculates the price — the caller can never send its own. Addresses must be inside a served city.</p>
-        <label>Pickup (lat, lng)</label>
-        <div class="row"><input id="puLat" value="42.3149"><input id="puLng" value="-83.0364"></div>
-        <label>Drop-off (lat, lng)</label>
-        <div class="row"><input id="doLat" value="42.3201"><input id="doLng" value="-83.0187"></div>
-        <label>Parcels — small, medium, large</label>
-        <div class="row3"><input id="pSmall" value="2"><input id="pMedium" value="1"><input id="pLarge" value="0"></div>
-        <button id="btnQuote" onclick="getQuote()" disabled>Get quote</button>
-        <div class="result" id="quoteOut"></div>
-      </div>
-
-      <div class="card">
-        <h2><span class="step">3</span> Create the delivery</h2>
-        <p class="sub">Create a <b>test-mode</b> delivery, priced from the quote above. Returns an errand id and a handover code.</p>
-        <label>Recipient name</label>
-        <input id="rName" value="Jordan Alvarez">
-        <label>Recipient phone</label>
-        <input id="rPhone" value="+15195550188">
-        <button id="btnCreate" onclick="createErrand()" disabled>Create delivery</button>
-        <div class="result" id="errandOut"></div>
-      </div>
+    <div class="card">
+      <h2><span class="step">1</span> API key &amp; wallet</h2>
+      <p class="sub">A business gets a key (we store only a hash) and a prepaid wallet. Keys can be rotated or revoked instantly, and every action is logged.</p>
+      <label>Business name</label>
+      <input id="business" value="Acme Co">
+      <button id="btnKey" onclick="genKey()">Generate test key</button>
+      <div class="result" id="keyOut"></div>
     </div>
 
-    <!-- RIGHT: deliveries -->
-    <div>
-      <div class="section-title">Your deliveries</div>
-      <div class="card" style="padding:14px 10px">
-        <table>
-          <thead><tr><th>Code</th><th>Status</th><th>Vehicle</th><th style="text-align:right">Price</th></tr></thead>
-          <tbody id="deliveryRows"><tr><td colspan="4" class="empty">No deliveries yet — create one on the left.</td></tr></tbody>
-        </table>
-        <div style="padding:10px 10px 2px"><button class="btn2" id="btnList" onclick="loadErrands()" disabled style="margin-top:0">Refresh</button></div>
-      </div>
-      <div class="section-title" style="margin-top:22px">Why it's safe</div>
-      <div class="card" style="font-size:13.5px;color:var(--ink-2)">
-        <div class="kv"><span>Price tampering</span><b class="pill ok">blocked</b></div>
-        <div class="kv"><span>Keys in plaintext</span><b class="pill ok">never</b></div>
-        <div class="kv"><span>Cross-business access</span><b class="pill ok">isolated</b></div>
-        <div class="kv"><span>Leaked key</span><b class="pill ok">revoke instantly</b></div>
-      </div>
+    <div class="card">
+      <h2><span class="step">2</span> Get a price quote</h2>
+      <p class="sub">The <b>server</b> calculates the price — the caller can never send its own.</p>
+      <label>Pickup (lat, lng)</label>
+      <div class="row"><input id="puLat" value="42.3149"><input id="puLng" value="-83.0364"></div>
+      <label>Drop-off (lat, lng)</label>
+      <div class="row"><input id="doLat" value="42.3201"><input id="doLng" value="-83.0187"></div>
+      <label>Parcels — small, medium, large</label>
+      <div class="row3"><input id="pSmall" value="2"><input id="pMedium" value="1"><input id="pLarge" value="0"></div>
+      <button id="btnQuote" onclick="getQuote()" disabled>Get quote</button>
+      <div class="result" id="quoteOut"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">3</span> Create &amp; manage the delivery</h2>
+      <p class="sub">Booking charges the wallet. You can schedule it, then track, advance, or cancel.</p>
+      <label>Recipient name</label>
+      <input id="rName" value="Jordan Alvarez">
+      <label>Recipient phone</label>
+      <input id="rPhone" value="+15195550188">
+      <label>Scheduled time (optional — leave blank for ASAP)</label>
+      <input id="schedAt" type="datetime-local">
+      <button id="btnCreate" onclick="createErrand()" disabled>Create delivery</button>
+      <div class="result" id="errandOut"></div>
     </div>
   </div>
 
-  <!-- API REFERENCE -->
-  <div id="reference" style="margin-top:14px">
-    <div class="section-title">API Reference</div>
-    <div class="card" style="padding:8px 10px">
-      <table>
-        <thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0;padding:9px 10px">/v1/keys</td><td>Issue a test API key</td></tr>
-          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0;padding:9px 10px">/v1/keys/revoke</td><td>Revoke a key instantly</td></tr>
-          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0;padding:9px 10px">/v1/quotes</td><td>Price a route (server-computed)</td></tr>
-          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0;padding:9px 10px">/v1/errands</td><td>Create a delivery (single or multi-stop)</td></tr>
-          <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0;padding:9px 10px">/v1/errands/{id}</td><td>Retrieve a delivery</td></tr>
-          <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0;padding:9px 10px">/v1/errands</td><td>List your deliveries</td></tr>
-          <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0;padding:9px 10px">/v1/service-areas</td><td>Service coverage</td></tr>
-          <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0;padding:9px 10px">/v1/health</td><td>Health check</td></tr>
-        </tbody>
-      </table>
+  <!-- RIGHT -->
+  <div>
+    <div class="section-title">Your deliveries</div>
+    <div class="card" style="padding:14px 10px">
+      <table><thead><tr><th>Code</th><th>Status</th><th style="text-align:right">Price</th></tr></thead>
+      <tbody id="deliveryRows"><tr><td colspan="3" class="empty">No deliveries yet.</td></tr></tbody></table>
+    </div>
+
+    <div class="section-title" style="margin-top:20px">Key audit log</div>
+    <div class="card" style="padding:14px 10px">
+      <table><thead><tr><th>Action</th><th>Key</th><th>When</th></tr></thead>
+      <tbody id="auditRows"><tr><td colspan="3" class="empty">No key actions yet.</td></tr></tbody></table>
+    </div>
+
+    <div class="section-title" style="margin-top:20px">Why it's safe</div>
+    <div class="card" style="font-size:13.5px">
+      <div class="kv"><span>Price tampering</span><b class="pill ok">blocked</b></div>
+      <div class="kv"><span>Keys in plaintext</span><b class="pill ok">never</b></div>
+      <div class="kv"><span>Cross-business access</span><b class="pill ok">isolated</b></div>
+      <div class="kv"><span>Leaked key</span><b class="pill ok">revoke instantly</b></div>
     </div>
   </div>
+</div>
+
+<div id="reference" style="margin-top:14px">
+  <div class="section-title">API Reference</div>
+  <div class="card" style="padding:8px 10px"><table>
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr></thead><tbody>
+      <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/keys</td><td>Issue a key</td></tr>
+      <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/keys/rotate</td><td>Rotate a key</td></tr>
+      <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/keys/revoke</td><td>Revoke a key</td></tr>
+      <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0">/v1/keys/audit</td><td>Key audit log</td></tr>
+      <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/quotes</td><td>Price a route</td></tr>
+      <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/errands</td><td>Create a delivery</td></tr>
+      <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0">/v1/errands/{id}/tracking</td><td>Track a delivery</td></tr>
+      <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/errands/{id}/cancel</td><td>Cancel (with fee rules)</td></tr>
+      <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0">/v1/wallet</td><td>Wallet balance</td></tr>
+    </tbody></table></div>
+</div>
 </main>
 
 <footer>Sandbox / mock data · Windsor service area · prices computed server-side, tax in (CAD) · Business 3 · Group 6</footer>
 
 <script>
-let API_KEY = null, QUOTE_ID = null, KEY_PREFIX = null;
-const $ = id => document.getElementById(id);
-const money = n => "$" + Number(n).toFixed(2);
-function show(el, html){ el.innerHTML = html; el.classList.add("show"); }
-function fail(el, msg){ show(el, '<span class="err">'+msg+'</span>'); }
+let API_KEY=null, QUOTE_ID=null, KEY_PREFIX=null, ERRAND_ID=null;
+const $=id=>document.getElementById(id);
+const money=n=>"$"+Number(n).toFixed(2);
+const show=(el,h)=>{el.innerHTML=h;el.classList.add("show");};
+const fail=(el,m)=>show(el,'<span class="err">'+m+'</span>');
+const kv=(k,v)=>'<div class="kv"><span>'+k+'</span><b>'+v+'</b></div>';
 
-async function api(path, method, body){
-  const headers = {"Content-Type":"application/json"};
-  if(API_KEY) headers["Authorization"] = "Bearer " + API_KEY;
-  const r = await fetch(path, {method, headers, body: body?JSON.stringify(body):undefined});
-  const data = await r.json().catch(()=>({}));
-  return {ok:r.ok, status:r.status, data};
+async function api(path,method,body){
+  const h={"Content-Type":"application/json"};
+  if(API_KEY) h["Authorization"]="Bearer "+API_KEY;
+  const r=await fetch(path,{method,headers:h,body:body?JSON.stringify(body):undefined});
+  const d=await r.json().catch(()=>({}));
+  return {ok:r.ok,status:r.status,data:d};
 }
 
+/* ---- Nikhil: keys (generate / rotate / revoke) + audit ---- */
 async function genKey(){
-  $("btnKey").disabled = true;
-  const r = await api("/v1/keys","POST",{business: $("business").value});
-  $("btnKey").disabled = false;
-  if(!r.ok){ return fail($("keyOut"), "Error "+r.status); }
-  API_KEY = r.data.key; KEY_PREFIX = r.data.prefix;
-  $("sKey").textContent = "active"; $("sKey").style.color = "var(--ok)";
+  $("btnKey").disabled=true;
+  const r=await api("/v1/keys","POST",{business:$("business").value});
+  $("btnKey").disabled=false;
+  if(!r.ok) return fail($("keyOut"),"Error "+r.status);
+  API_KEY=r.data.key; KEY_PREFIX=r.data.prefix;
+  $("sKey").textContent="active"; $("sKey").style.color="var(--ok)";
   show($("keyOut"),
     '<div class="pill">test key · '+r.data.business+'</div>'+
     '<div class="mono" style="margin-top:9px">'+r.data.key+'</div>'+
-    '<div class="note">Scopes: '+r.data.scopes.join(", ")+'. Stored only as a hash — shown once.</div>'+
-    '<button class="btn2" onclick="revokeKey()">Revoke this key</button>'+
-    '<div id="revokeOut" class="note"></div>');
-  $("btnQuote").disabled = false; $("btnList").disabled = false;
+    '<div class="note">Scopes: '+r.data.scopes.join(", ")+'. Stored only as a hash.</div>'+
+    '<button class="btn2 sm" onclick="rotateKey()">Rotate key</button>'+
+    '<button class="btn2 sm" onclick="revokeKey()">Revoke key</button>'+
+    '<div id="keyMsg" class="note"></div>');
+  $("btnQuote").disabled=false;
+  loadWallet(); loadAudit();
 }
-
+async function rotateKey(){
+  const r=await api("/v1/keys/rotate","POST",{prefix:KEY_PREFIX});
+  if(!r.ok) return $("keyMsg").innerHTML='<span class="err">Could not rotate.</span>';
+  const oldKey=API_KEY; API_KEY=r.data.key; KEY_PREFIX=r.data.prefix;
+  const t=await api("/v1/quotes","POST",{pickup:{lat:"42.3149",lng:"-83.0364"},stops:[{lat:"42.3201",lng:"-83.0187",parcels:{small:1}}]});
+  // test the OLD key is dead
+  const chk=await fetch("/v1/wallet",{headers:{"Authorization":"Bearer "+oldKey}});
+  $("keyMsg").innerHTML='<b style="color:var(--violet)">Rotated.</b> New key issued, old key now returns HTTP '+chk.status+'. Logged in the audit trail.';
+  $("keyOut").querySelector(".mono").textContent=API_KEY;
+  loadAudit();
+}
 async function revokeKey(){
-  const rv = await api("/v1/keys/revoke","POST",{prefix: KEY_PREFIX});
-  if(!rv.ok){ $("revokeOut").innerHTML = '<span class="err">Could not revoke.</span>'; return; }
-  const test = await api("/v1/quotes","POST",{pickup:{lat:"42.3149",lng:"-83.0364"},
-    stops:[{lat:"42.3201",lng:"-83.0187",parcels:{small:1}}]});
-  $("sKey").textContent = "revoked"; $("sKey").style.color = "var(--err)";
-  $("revokeOut").innerHTML = '<b style="color:var(--violet)">Key revoked.</b> A request with it now returns HTTP '
-    + test.status + ' ('+((test.data.error&&test.data.error.code)||'')+') — instant, zero impact elsewhere.';
+  const rv=await api("/v1/keys/revoke","POST",{prefix:KEY_PREFIX});
+  if(!rv.ok) return $("keyMsg").innerHTML='<span class="err">Could not revoke.</span>';
+  const t=await api("/v1/quotes","POST",{pickup:{lat:"42.3149",lng:"-83.0364"},stops:[{lat:"42.3201",lng:"-83.0187",parcels:{small:1}}]});
+  $("sKey").textContent="revoked"; $("sKey").style.color="var(--err)";
+  $("keyMsg").innerHTML='<b style="color:var(--violet)">Revoked.</b> The key now returns HTTP '+t.status+' — instant, and logged.';
+  loadAudit();
+}
+async function loadAudit(){
+  const r=await api("/v1/keys/audit","GET");
+  const rows=(r.data.audit||[]).slice(0,6);
+  $("auditRows").innerHTML = rows.length ? rows.map(a=>
+    '<tr><td><b>'+a.action.replace("key.","")+'</b></td><td class="mono" style="background:none;border:0">'+(a.key_prefix||"")+'</td><td>'+a.at.slice(11,19)+'</td></tr>').join("")
+    : '<tr><td colspan="3" class="empty">No key actions yet.</td></tr>';
 }
 
+/* ---- Charan: wallet ---- */
+async function loadWallet(){
+  const r=await api("/v1/wallet","GET");
+  if(r.ok) $("sWallet").textContent=money(r.data.balance);
+}
+
+/* ---- Sujith: pricing ---- */
 async function getQuote(){
-  const stop = {lat:$("doLat").value, lng:$("doLng").value,
-    parcels:{small:+$("pSmall").value||0, medium:+$("pMedium").value||0, large:+$("pLarge").value||0}};
-  const r = await api("/v1/quotes","POST",{pickup:{lat:$("puLat").value, lng:$("puLng").value}, stops:[stop]});
-  if(!r.ok){ return fail($("quoteOut"), (r.data.error&&r.data.error.message)||("Error "+r.status)); }
-  QUOTE_ID = r.data.quote_id; const d = r.data;
+  const stop={lat:$("doLat").value,lng:$("doLng").value,parcels:{small:+$("pSmall").value||0,medium:+$("pMedium").value||0,large:+$("pLarge").value||0}};
+  const r=await api("/v1/quotes","POST",{pickup:{lat:$("puLat").value,lng:$("puLng").value},stops:[stop]});
+  if(!r.ok) return fail($("quoteOut"),(r.data.error&&r.data.error.message)||("Error "+r.status));
+  QUOTE_ID=r.data.quote_id; const d=r.data;
   show($("quoteOut"),
-    kv("Base (stops)", money(d.dropBaseTotal))+
-    kv("Distance ("+d.routeKm+" km)", money(d.distanceCharge))+
-    kv("Parcel size add-ons", money(d.sizeAddOnTotal))+
-    kv("Pre-tax", money(d.routePrice))+
-    kv("HST (13%)", money(d.hst))+
+    kv("Base (stops)",money(d.dropBaseTotal))+kv("Distance ("+d.routeKm+" km)",money(d.distanceCharge))+
+    kv("Parcel size add-ons",money(d.sizeAddOnTotal))+kv("Pre-tax",money(d.routePrice))+kv("HST (13%)",money(d.hst))+
     '<div class="kv"><span>Total (tax in)</span><b class="total">'+money(d.chargeTotal)+'</b></div>'+
-    '<div class="note">Recommended vehicle: '+d.recommendedVehicle+' · quote '+d.quote_id+'</div>');
-  $("btnCreate").disabled = false;
+    '<div class="note">Recommended vehicle: '+d.recommendedVehicle+'</div>');
+  $("btnCreate").disabled=false;
 }
 
+/* ---- create + Sai: track / advance / cancel ---- */
 async function createErrand(){
-  const body = {quote_id: QUOTE_ID,
-    pickup:{lat:$("puLat").value, lng:$("puLng").value},
-    dropoff:{lat:$("doLat").value, lng:$("doLng").value,
-      contact:{name:$("rName").value, phone_number:$("rPhone").value}, preference:"leave_at_door"}};
-  const r = await api("/v1/errands","POST",body);
-  if(!r.ok){ return fail($("errandOut"), (r.data.error&&r.data.error.message)||("Error "+r.status)); }
-  const e = r.data;
+  const body={quote_id:QUOTE_ID,pickup:{lat:$("puLat").value,lng:$("puLng").value},
+    dropoff:{lat:$("doLat").value,lng:$("doLng").value,contact:{name:$("rName").value,phone_number:$("rPhone").value},preference:"leave_at_door"}};
+  if($("schedAt").value) body.scheduled_at=new Date($("schedAt").value).toISOString();
+  const r=await api("/v1/errands","POST",body);
+  if(!r.ok) return fail($("errandOut"),(r.data.error&&r.data.error.message)||("Error "+r.status));
+  const e=r.data; ERRAND_ID=e.errand_id;
+  renderErrand(e);
+  loadErrands(); loadWallet();
+}
+function renderErrand(e){
   show($("errandOut"),
     '<div class="pill">'+(e.test_mode?"TEST · ":"")+e.status+'</div>'+
-    kv("Errand ID", '<span class="mono">'+e.errand_id+'</span>')+
-    kv("Handover code", "<b>"+e.delivery_code+"</b>")+
-    kv("Vehicle", e.vehicle_type)+
-    kv("Price", '<b class="total">'+money(e.pricing.charge_total)+'</b>'));
+    kv("Errand ID",'<span class="mono">'+e.errand_id+'</span>')+
+    kv("Handover code","<b>"+e.delivery_code+"</b>")+kv("Paid from wallet",money(e.pricing.charge_total))+
+    '<div style="margin-top:10px"><b>Lifecycle</b> — <span id="lcStatus">'+e.status+'</span> <span id="lcDriver"></span></div>'+
+    '<button class="sm" onclick="advance()">Advance (simulate driver)</button>'+
+    '<button class="btn2 sm" onclick="cancelErrand()">Cancel</button>'+
+    '<div id="lcOut" class="note"></div>');
+}
+async function advance(){
+  const r=await api("/v1/errands/"+ERRAND_ID+"/advance","POST",{});
+  if(!r.ok){ $("lcOut").innerHTML=(r.data.error&&r.data.error.message)||"At final stage."; return; }
+  const t=await api("/v1/errands/"+ERRAND_ID+"/tracking","GET");
+  $("lcStatus").textContent=t.data.status;
+  $("lcDriver").innerHTML = t.data.driver ? '· driver <b>'+t.data.driver.name+'</b> ('+t.data.driver.vehicle+')' : '';
+  $("lcOut").innerHTML='Status moved to <b>'+t.data.status+'</b>.';
   loadErrands();
+}
+async function cancelErrand(){
+  const r=await api("/v1/errands/"+ERRAND_ID+"/cancel","POST",{});
+  if(r.status===409){ $("lcOut").innerHTML='<b style="color:var(--err)">Can\'t cancel</b> — the driver already picked it up. (That rule is enforced.)'; return; }
+  if(!r.ok){ $("lcOut").innerHTML="Error "+r.status; return; }
+  $("lcStatus").textContent="cancelled";
+  $("lcOut").innerHTML='<b style="color:var(--violet)">Cancelled.</b> Fee '+money(r.data.fee)+', refunded '+money(r.data.refund)+' to the wallet.';
+  loadErrands(); loadWallet();
 }
 
 async function loadErrands(){
-  const r = await api("/v1/errands","GET");
-  if(!r.ok){ return; }
-  const list = r.data.errands || [];
-  $("sDeliveries").textContent = list.length;
-  const total = list.reduce((s,e)=>s + Number(e.pricing.charge_total), 0);
-  $("sValue").textContent = money(total);
-  if(!list.length){ $("deliveryRows").innerHTML = '<tr><td colspan="4" class="empty">No deliveries yet — create one on the left.</td></tr>'; return; }
-  $("deliveryRows").innerHTML = list.map(e =>
-    '<tr><td><b>'+e.delivery_code+'</b> '+(e.test_mode?'<span class="badge">TEST</span>':'')+'</td>'+
-    '<td>'+e.status+'</td><td>'+e.vehicle_type+'</td>'+
-    '<td style="text-align:right">'+money(e.pricing.charge_total)+'</td></tr>').join("");
+  const r=await api("/v1/errands","GET"); if(!r.ok) return;
+  const list=r.data.errands||[];
+  $("sDeliveries").textContent=list.length;
+  $("sValue").textContent=money(list.reduce((s,e)=>s+Number(e.pricing.charge_total),0));
+  $("deliveryRows").innerHTML = list.length ? list.map(e=>
+    '<tr><td><b>'+e.delivery_code+'</b> '+(e.test_mode?'<span class="badge">TEST</span>':'')+'</td><td>'+e.status+'</td><td style="text-align:right">'+money(e.pricing.charge_total)+'</td></tr>').join("")
+    : '<tr><td colspan="3" class="empty">No deliveries yet.</td></tr>';
 }
-function kv(k,v){ return '<div class="kv"><span>'+k+'</span><b>'+v+'</b></div>'; }
 </script>
 </body>
 </html>
