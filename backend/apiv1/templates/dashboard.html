@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>aerrand · Developer Portal</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%235202d9'/><text x='16' y='23' font-size='19' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'>a</text></svg>">
 <style>
   :root{
     --violet:#5202d9; --violet-d:#4201ad; --lilac:#ccaaff; --lilac-bg:#f4eefe;
@@ -89,6 +90,11 @@
   .tabs button.on{background:var(--violet);color:#fff}
   pre{background:var(--code);color:#e8e6f5;border-radius:12px;padding:14px 16px;overflow:auto;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.55;margin:0}
   pre .k{color:#c3a6ff}.s{color:#9ae6b4}.c{color:#6b6b80}
+  #toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;font-size:13.5px;font-weight:600;opacity:0;transform:translateY(12px);transition:all .25s;z-index:100;box-shadow:0 10px 30px rgba(0,0,0,.2);pointer-events:none}
+  #toast.show{opacity:1;transform:translateY(0)}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:5px}
+  button.copy{background:none;border:1px solid var(--line);color:var(--muted);padding:5px 10px;font-size:11.5px;margin:0}
+  button.copy:hover{background:#f5f4f9;color:var(--violet)}
   @media(max-width:860px){.sidebar{display:none}.cards{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}}
 </style>
 </head>
@@ -105,7 +111,7 @@
       <a data-p="webhooks" onclick="nav('webhooks')">⇄ Webhooks</a>
       <a data-p="docs" onclick="nav('docs')">⌨ API reference</a>
     </nav>
-    <div class="side-foot"><b>Business 3 · Group 6</b><br>Sandbox environment<br>api.aerrand.com/v1</div>
+    <div class="side-foot"><div id="apiStatus" style="margin-bottom:9px;font-weight:600">● checking…</div><b>Business 3 · Group 6</b><br>Sandbox environment<br>api.aerrand.com/v1</div>
   </aside>
 
   <div class="main">
@@ -216,7 +222,7 @@
       <!-- DOCS -->
       <section class="page" id="p-docs">
         <div class="card"><h3>Quickstart</h3><p class="d">Three calls: get a key, price a route, create a delivery. Pick a language.</p>
-          <div class="tabs"><button class="on" onclick="lang('curl')">cURL</button><button onclick="lang('py')">Python</button><button onclick="lang('js')">JavaScript</button></div>
+          <div class="tabs"><button class="on" onclick="lang('curl')">cURL</button><button onclick="lang('py')">Python</button><button onclick="lang('js')">JavaScript</button><button class="copy" style="margin-left:auto" onclick="copy($('codeBlock').innerText)">Copy</button></div>
           <pre id="codeBlock"></pre></div>
         <div class="card"><h3>Endpoints</h3><table><thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead><tbody>
           <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/keys · /keys/rotate · /keys/revoke</td><td>Key lifecycle</td></tr>
@@ -241,6 +247,8 @@ const show=(el,h)=>{el.innerHTML=h;el.classList.add("show");};
 const fail=(el,m)=>show(el,'<span class="err">'+m+'</span>');
 const kv=(k,v)=>'<div class="kv"><span>'+k+'</span><b>'+v+'</b></div>';
 const TITLES={overview:"Overview",create:"Create delivery",deliveries:"Deliveries",tracking:"Live tracking",wallet:"Wallet",webhooks:"Webhooks",docs:"API reference"};
+let _tt; function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show");clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove("show"),2600);}
+function copy(txt){(navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast("Copied to clipboard")).catch(()=>toast("Copy not available"));}
 
 function nav(p){
   document.querySelectorAll(".page").forEach(s=>s.classList.remove("active"));
@@ -270,10 +278,11 @@ async function genKey(){
   if(!r.ok) return fail($("keyOut"),"Error "+r.status);
   API_KEY=r.data.key; KEY_PREFIX=r.data.prefix; BUSINESS=r.data.business;
   $("keyChip").textContent="● "+BUSINESS; $("keyChip").className="chip env";
-  show($("keyOut"),'<div class="pill">test key · '+BUSINESS+'</div><div class="mono" style="margin-top:9px">'+r.data.key+'</div>'+
+  show($("keyOut"),'<div class="pill">test key · '+BUSINESS+'</div>'+
+    '<div style="display:flex;gap:8px;align-items:center;margin-top:9px"><div class="mono" style="flex:1">'+r.data.key+'</div><button class="copy" onclick="copy(\''+r.data.key+'\')">Copy</button></div>'+
     '<div class="note">Scopes: '+r.data.scopes.join(", ")+'. Stored only as a hash.</div>'+
     '<button class="ghost sm" onclick="rotateKey()">Rotate</button><button class="ghost sm" onclick="revokeKey()">Revoke</button><div id="keyMsg" class="note"></div>');
-  $("btnQuote").disabled=false; loadWallet();
+  $("btnQuote").disabled=false; loadWallet(); toast("API key created");
 }
 async function rotateKey(){
   const r=await api("/v1/keys/rotate","POST",{prefix:KEY_PREFIX}); if(!r.ok)return;
@@ -298,7 +307,7 @@ async function loadWallet(){
   $("txnRows").innerHTML = tx.length? tx.map(t=>'<tr><td><span class="badge">'+t.kind+'</span></td><td>'+t.note+'</td><td>'+t.at.slice(5,16).replace("T"," ")+'</td><td style="text-align:right" class="'+(t.amount<0?'neg':'pos')+'">'+(t.amount<0?'':'+')+money(t.amount)+'</td></tr>').join("")
     : '<tr><td colspan="4" class="empty">No transactions yet.</td></tr>';
 }
-async function topup(){ await api("/v1/wallet/topup","POST",{amount:50}); loadWallet(); }
+async function topup(){ await api("/v1/wallet/topup","POST",{amount:50}); loadWallet(); toast("Topped up $50.00"); }
 
 /* pricing (Sujith) */
 async function getQuote(){
@@ -318,7 +327,7 @@ async function createErrand(){
   if(!r.ok) return fail($("errandOut"),(r.data.error&&r.data.error.message)||("Error "+r.status));
   const e=r.data; ERRAND_ID=e.errand_id;
   show($("errandOut"),'<div class="pill">'+(e.test_mode?"TEST · ":"")+e.status+'</div>'+kv("Errand ID",'<span class="mono">'+e.errand_id+'</span>')+kv("Handover code","<b>"+e.delivery_code+"</b>")+kv("Charged to wallet",money(e.pricing.charge_total))+'<div class="note">Opening live tracking…</div>');
-  loadWallet(); setTimeout(()=>{nav("tracking");},700);
+  loadWallet(); toast("Delivery created · wallet charged "+money(e.pricing.charge_total)); setTimeout(()=>{nav("tracking");},700);
 }
 
 async function refreshTrack(){
@@ -353,12 +362,13 @@ function renderTrack(t){
 async function advance(){
   const r=await api("/v1/errands/"+ERRAND_ID+"/advance","POST",{});
   if(!r.ok){$("trackMsg").innerHTML=(r.data.error&&r.data.error.message)||"At final stage.";}
+  else{ toast(r.data.status==="delivered"?"Delivered ✓":"Status → "+r.data.status); }
   refreshTrack(); loadEvents();
 }
 async function cancelErrand(){
   const r=await api("/v1/errands/"+ERRAND_ID+"/cancel","POST",{});
   if(r.status===409){$("trackMsg").innerHTML='<b style="color:var(--err)">Can\'t cancel</b> — the driver has already picked up (rule enforced).';return;}
-  if(r.ok){$("trackMsg").innerHTML='<b style="color:var(--violet)">Cancelled.</b> Fee '+money(r.data.fee)+', refunded '+money(r.data.refund)+' to the wallet.'; refreshTrack(); loadWallet(); loadEvents();}
+  if(r.ok){$("trackMsg").innerHTML='<b style="color:var(--violet)">Cancelled.</b> Fee '+money(r.data.fee)+', refunded '+money(r.data.refund)+' to the wallet.'; refreshTrack(); loadWallet(); loadEvents(); toast("Cancelled · refunded "+money(r.data.refund));}
 }
 
 /* deliveries + overview */
@@ -386,6 +396,7 @@ async function registerWebhook(){
   const r=await api("/v1/webhooks","POST",{url:$("whUrl").value});
   if(!r.ok) return fail($("whOut"),(r.data.error&&r.data.error.message)||"Error");
   show($("whOut"),'<b style="color:var(--violet)">Endpoint added.</b> id '+r.data.id+' — events: '+r.data.events.join(", "));
+  toast("Webhook endpoint added");
 }
 
 /* docs code samples */
@@ -397,6 +408,19 @@ const SAMPLES={
 };
 function lang(l){CURLANG=l;$("codeBlock").innerHTML=SAMPLES[l];document.querySelectorAll(".tabs button").forEach((b,i)=>b.classList.toggle("on",["curl","py","js"][i]===l));}
 lang("curl");
+
+/* live API status in the sidebar */
+(async()=>{
+  try{
+    const h=await (await fetch("/v1/health")).json();
+    const good=h.mongodb==="connected"&&h.redis==="connected";
+    $("apiStatus").innerHTML=good
+      ? '<span class="dot"></span>API online · DB · cache'
+      : '<span class="dot" style="background:var(--err)"></span>degraded';
+    $("apiStatus").style.color=good?"var(--ok)":"var(--err)";
+  }catch(e){ $("apiStatus").innerHTML='<span class="dot" style="background:var(--err)"></span>offline'; }
+})();
 </script>
+<div id="toast"></div>
 </body>
 </html>
