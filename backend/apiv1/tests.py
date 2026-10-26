@@ -196,3 +196,42 @@ class ApiFlowTests(TestCase):
                          content_type="application/json")
         self.assertEqual(self.client.post("/v1/quotes", json.dumps(q),
                          content_type="application/json", **self._h(k)).status_code, 401)
+
+
+class IdempotencyTests(TestCase):
+    def setUp(self):
+        db.set_db_for_tests(mongomock.MongoClient()["aerrand"])
+        self.key = _make_key("Acme Co")
+
+    def _h(self, extra=None):
+        h = {"HTTP_AUTHORIZATION": f"Bearer {self.key}"}
+        if extra:
+            h.update(extra)
+        return h
+
+    def _quote(self):
+        return self.client.post("/v1/quotes",
+            json.dumps({"pickup": WINDSOR_PICKUP, "stops": [STOP1]}),
+            content_type="application/json", **self._h()).json()["quote_id"]
+
+    def test_replay_returns_same_delivery(self):
+        body = {"quote_id": self._quote(),
+                "dropoff": {"lat": "42.28", "lng": "-82.99",
+                            "contact": {"name": "J", "phone_number": "+1"}}}
+        h = self._h({"HTTP_IDEMPOTENCY_KEY": "abc-123"})
+        r1 = self.client.post("/v1/errands", json.dumps(body), content_type="application/json", **h)
+        r2 = self.client.post("/v1/errands", json.dumps(body), content_type="application/json", **h)
+        self.assertEqual(r1.status_code, 201)
+        self.assertEqual(r2.status_code, 201)
+        self.assertEqual(r1.json()["errand_id"], r2.json()["errand_id"])  # no duplicate
+        self.assertEqual(db.errands().count_documents({}), 1)
+
+    def test_same_key_different_body_is_422(self):
+        h = self._h({"HTTP_IDEMPOTENCY_KEY": "dup-key"})
+        b1 = {"quote_id": self._quote(),
+              "dropoff": {"lat": "42.28", "lng": "-82.99", "contact": {"name": "A", "phone_number": "+1"}}}
+        self.client.post("/v1/errands", json.dumps(b1), content_type="application/json", **h)
+        b2 = {"quote_id": self._quote(),
+              "dropoff": {"lat": "42.28", "lng": "-82.99", "contact": {"name": "B", "phone_number": "+2"}}}
+        r = self.client.post("/v1/errands", json.dumps(b2), content_type="application/json", **h)
+        self.assertEqual(r.status_code, 422)

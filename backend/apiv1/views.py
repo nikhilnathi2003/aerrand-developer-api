@@ -12,7 +12,7 @@ from rest_framework.decorators import (
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from . import audit, db, keys, lifecycle, pricing, scheduling, wallet, webhooks
+from . import audit, db, idempotency, keys, lifecycle, pricing, scheduling, wallet, webhooks
 from .authentication import ApiKeyAuthentication, require_scope
 from .errors import error_response
 
@@ -172,6 +172,18 @@ def _create_errand(request):
     owner = request.user.business_owner_id
     environment = request.api_key["environment"]
 
+    # idempotency: a retried request with the same key must not create a second delivery
+    idem_key = request.META.get("HTTP_IDEMPOTENCY_KEY")
+    idem_fp = idempotency.fingerprint(body) if idem_key else None
+    if idem_key:
+        existing = idempotency.lookup(owner, idem_key)
+        if existing:
+            if existing["fingerprint"] == idem_fp:
+                return Response(existing["response"], status=201,
+                                headers={"Idempotent-Replayed": "true"})
+            return error_response("idempotency_key_reused",
+                                  "This Idempotency-Key was already used with a different request.", 422)
+
     quote_id = body.get("quote_id")
     if not quote_id:
         return error_response("validation_failed", "Invalid request.", 400,
@@ -273,9 +285,10 @@ def _create_errand(request):
     if paid:
         webhooks.record_event(owner, "errand.paid", created[0])
 
-    if batch_id:
-        return Response(_batch_response(created, breakdown, batch_id), status=201)
-    return Response(_errand_response(created[0]), status=201)
+    resp = _batch_response(created, breakdown, batch_id) if batch_id else _errand_response(created[0])
+    if idem_key:
+        idempotency.save(owner, idem_key, idem_fp, resp)
+    return Response(resp, status=201)
 
 
 # --------------------------------------------------------------------------- #
