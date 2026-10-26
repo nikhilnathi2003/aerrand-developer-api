@@ -12,7 +12,7 @@ from rest_framework.decorators import (
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from . import audit, db, keys, lifecycle, pricing, scheduling, wallet
+from . import audit, db, keys, lifecycle, pricing, scheduling, wallet, webhooks
 from .authentication import ApiKeyAuthentication, require_scope
 from .errors import error_response
 
@@ -268,6 +268,11 @@ def _create_errand(request):
         db.errands().insert_one(doc)
         created.append(doc)
 
+    # webhook events (Charan/team): capture + sign lifecycle events
+    webhooks.record_event(owner, "errand.created", created[0])
+    if paid:
+        webhooks.record_event(owner, "errand.paid", created[0])
+
     if batch_id:
         return Response(_batch_response(created, breakdown, batch_id), status=201)
     return Response(_errand_response(created[0]), status=201)
@@ -433,7 +438,11 @@ def audit_log(request):
 def wallet_balance(request):
     require_scope(request, "read")
     owner = request.user.business_owner_id
-    return Response({"currency": "CAD", "balance": round(wallet.get_balance(owner) / 100, 2)})
+    return Response({
+        "currency": "CAD",
+        "balance": round(wallet.get_balance(owner) / 100, 2),
+        "transactions": wallet.transactions(owner, 25),
+    })
 
 
 @api_view(["POST"])
@@ -461,10 +470,18 @@ def track_errand(request, errand_id):
     doc = _owned(request.user.business_owner_id, errand_id)
     if not doc:
         return error_response("errand_not_found", "Errand not found.", 404)
+    driver = doc.get("driver")
+    eta_min = None
+    if driver and doc["status"] not in ("delivered", "cancelled"):
+        remaining_km = pricing.haversine_km(driver, doc["dropoff"]) * 1.3
+        eta_min = max(1, round(remaining_km / 0.4))  # ~24 km/h
     return Response({
         "errand_id": doc["errand_id"],
         "status": doc["status"],
-        "driver": doc.get("driver"),
+        "driver": driver,
+        "eta_minutes": eta_min,
+        "pickup": {"lat": float(doc["pickup"]["lat"]), "lng": float(doc["pickup"]["lng"])},
+        "dropoff": {"lat": float(doc["dropoff"]["lat"]), "lng": float(doc["dropoff"]["lng"])},
         "timeline": doc.get("timeline", []),
         "delivery_code": doc["delivery_code"],
     })
@@ -486,15 +503,45 @@ def cancel_errand(request, errand_id):
     refund_cents = 0
     if doc["payment"]["status"] == "paid":
         refund_cents = max(0, doc["pricing"]["amount_cents"] - fee_cents)
-        wallet.topup(owner, refund_cents)  # refund to wallet
+        wallet.refund(owner, refund_cents, errand_id)  # refund to wallet
     db.errands().update_one({"errand_id": errand_id}, {"$set": {
         "status": "cancelled",
         "cancellation": {"fee": round(fee_cents / 100, 2), "refund": round(refund_cents / 100, 2),
                          "from_stage": doc["status"]},
     }})
+    doc["status"] = "cancelled"
+    webhooks.record_event(owner, "errand.cancelled", doc)
     return Response({"status": "cancelled",
                      "fee": round(fee_cents / 100, 2),
                      "refund": round(refund_cents / 100, 2)})
+
+
+# --------------------------------------------------------------------------- #
+# Webhooks (team) — register endpoints + read the signed event feed
+# --------------------------------------------------------------------------- #
+@api_view(["GET", "POST"])
+@authentication_classes([ApiKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def webhooks_collection(request):
+    require_scope(request, "read")
+    owner = request.user.business_owner_id
+    if request.method == "POST":
+        body = request.data or {}
+        url = body.get("url")
+        if not url or not url.startswith("https://"):
+            return error_response("validation_failed", "Invalid request.", 400,
+                                  {"url": "an https:// url is required"})
+        return Response(webhooks.register(owner, url, body.get("events")), status=201)
+    return Response({"endpoints": webhooks.list_endpoints(owner),
+                     "event_catalog": webhooks.EVENT_CATALOG})
+
+
+@api_view(["GET"])
+@authentication_classes([ApiKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def events_list(request):
+    require_scope(request, "read")
+    return Response({"events": webhooks.recent_events(request.user.business_owner_id, 25)})
 
 
 @api_view(["POST"])
@@ -514,14 +561,23 @@ def advance_errand(request, errand_id):
         return error_response("validation_failed", "Already at the final stage.", 400)
     nxt = order[order.index(cur) + 1]
     update = {"status": nxt}
-    # a simulated driver appears once the delivery is accepted
-    if nxt == "accepted" and not doc.get("driver"):
-        update["driver"] = {"name": "Sam O.", "vehicle": doc["vehicle_type"],
-                            "lat": 42.312, "lng": -83.03}
+    # simulate the driver moving from pickup toward the drop-off
+    progress = {"accepted": 0.0, "arrived": 0.05, "picked_up": 0.1, "in_transit": 0.6,
+                "arrived_dropoff": 0.95, "delivered": 1.0}.get(nxt)
+    if progress is not None:
+        pu, do = doc["pickup"], doc["dropoff"]
+        lat = float(pu["lat"]) + progress * (float(do["lat"]) - float(pu["lat"]))
+        lng = float(pu["lng"]) + progress * (float(do["lng"]) - float(pu["lng"]))
+        driver = doc.get("driver") or {
+            "name": "Sam O.", "phone": "+1 519 555 0101", "vehicle": doc["vehicle_type"],
+            "plate": "CXYZ 123", "rating": 4.9}
+        update["driver"] = {**driver, "lat": round(lat, 5), "lng": round(lng, 5)}
     db.errands().update_one({"errand_id": errand_id}, {
         "$set": update,
         "$push": {"timeline": {"status": nxt, "at": _now().isoformat()}},
     })
+    doc["status"] = nxt
+    webhooks.record_event(owner, f"errand.{nxt}", doc)
     return Response({"errand_id": errand_id, "status": nxt})
 
 

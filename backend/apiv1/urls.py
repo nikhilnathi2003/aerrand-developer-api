@@ -25,4 +25,8 @@ urlpatterns = [
     path("errands/<str:errand_id>/tracking", views.track_errand, name="track-errand"),
     path("errands/<str:errand_id>/cancel", views.cancel_errand, name="cancel-errand"),
     path("errands/<str:errand_id>/advance", views.advance_errand, name="advance-errand"),
+
+    # webhooks (team)
+    path("webhooks", views.webhooks_collection, name="webhooks"),
+    path("events", views.events_list, name="events"),
 ]

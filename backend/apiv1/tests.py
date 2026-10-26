@@ -157,6 +157,34 @@ class ApiFlowTests(TestCase):
         r = self.client.get(f"/v1/errands/{eid}/tracking", **self._h(self.acme))
         self.assertIsNotNone(r.json()["driver"])
 
+    # --- webhooks (team) ---
+    def test_webhook_events_recorded(self):
+        self._create()
+        r = self.client.get("/v1/events", **self._h(self.acme))
+        types = [e["type"] for e in r.json()["events"]]
+        self.assertIn("errand.created", types)
+        self.assertTrue(all(e["signature"].startswith("t=") for e in r.json()["events"]))
+
+    def test_webhook_register_requires_https(self):
+        r = self.client.post("/v1/webhooks", json.dumps({"url": "http://x.com"}),
+                             content_type="application/json", **self._h(self.acme))
+        self.assertEqual(r.status_code, 400)
+
+    # --- wallet statement (Charan) ---
+    def test_wallet_records_transactions(self):
+        self._create()
+        r = self.client.get("/v1/wallet", **self._h(self.acme))
+        kinds = [t["kind"] for t in r.json()["transactions"]]
+        self.assertIn("charge", kinds)
+
+    # --- driver moves (Sai) ---
+    def test_driver_moves_toward_dropoff(self):
+        eid = self._create()
+        self._advance_to(eid, "in_transit")
+        r = self.client.get(f"/v1/errands/{eid}/tracking", **self._h(self.acme))
+        self.assertIsNotNone(r.json()["driver"])
+        self.assertIsNotNone(r.json()["eta_minutes"])
+
     # --- key rotation (Nikhil) ---
     def test_rotate_key_kills_old_key(self):
         k = self.client.post("/v1/keys", json.dumps({"business": "Rotate Co"}),
