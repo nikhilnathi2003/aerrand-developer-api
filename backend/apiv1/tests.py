@@ -8,7 +8,7 @@ import uuid
 import mongomock
 from django.test import TestCase
 
-from apiv1 import db, keys, pricing
+from apiv1 import db, keys, pricing, wallet
 
 _NS = uuid.UUID("a1b2c3d4-0000-4000-8000-000000000000")
 WINDSOR_PICKUP = {"lat": "42.3149", "lng": "-83.0364"}
@@ -24,6 +24,7 @@ def _make_key(business, scopes=("create", "read", "cancel"), env="test"):
         "key_hash": keys.hash_key(plain), "scopes": list(scopes), "status": "active",
         "expires_at": None,
     })
+    wallet.topup(owner, 10000)  # fund the test wallet so bookings can pay
     return plain
 
 
@@ -98,3 +99,72 @@ class ApiFlowTests(TestCase):
         r = self.client.post("/v1/errands", json.dumps(body),
                              content_type="application/json", **self._h(self.readonly))
         self.assertEqual(r.status_code, 403)
+
+    # --- helpers for the newer features ---
+    def _acme_owner(self):
+        return str(uuid.uuid5(_NS, "acme co"))
+
+    def _create(self):
+        quote_id = self._quote()
+        body = {"quote_id": quote_id, "pickup": WINDSOR_PICKUP,
+                "dropoff": {"lat": "42.3201", "lng": "-83.0187",
+                            "contact": {"name": "Jordan", "phone_number": "+15195550188"}}}
+        r = self.client.post("/v1/errands", json.dumps(body),
+                             content_type="application/json", **self._h(self.acme))
+        self.assertEqual(r.status_code, 201)
+        return r.json()["errand_id"]
+
+    def _advance_to(self, eid, target):
+        for _ in range(10):
+            r = self.client.post(f"/v1/errands/{eid}/advance", **self._h(self.acme))
+            if r.json().get("status") == target:
+                return
+
+    # --- wallet (Charan) ---
+    def test_booking_charges_wallet(self):
+        owner = self._acme_owner()
+        before = wallet.get_balance(owner)
+        self._create()
+        self.assertLess(wallet.get_balance(owner), before)
+
+    def test_insufficient_funds(self):
+        owner = self._acme_owner()
+        wallet.debit(owner, wallet.get_balance(owner) - 100)  # leave $1
+        quote_id = self._quote()
+        body = {"quote_id": quote_id, "pickup": WINDSOR_PICKUP,
+                "dropoff": {"lat": "42.3201", "lng": "-83.0187",
+                            "contact": {"name": "Jordan", "phone_number": "+15195550188"}}}
+        r = self.client.post("/v1/errands", json.dumps(body),
+                             content_type="application/json", **self._h(self.acme))
+        self.assertEqual(r.status_code, 402)
+
+    # --- tracking / cancel (Sai) ---
+    def test_cancel_before_pickup_refunds(self):
+        eid = self._create()
+        r = self.client.post(f"/v1/errands/{eid}/cancel", **self._h(self.acme))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["status"], "cancelled")
+
+    def test_cannot_cancel_after_pickup(self):
+        eid = self._create()
+        self._advance_to(eid, "picked_up")
+        r = self.client.post(f"/v1/errands/{eid}/cancel", **self._h(self.acme))
+        self.assertEqual(r.status_code, 409)
+
+    def test_advance_adds_driver(self):
+        eid = self._create()
+        self._advance_to(eid, "accepted")
+        r = self.client.get(f"/v1/errands/{eid}/tracking", **self._h(self.acme))
+        self.assertIsNotNone(r.json()["driver"])
+
+    # --- key rotation (Nikhil) ---
+    def test_rotate_key_kills_old_key(self):
+        k = self.client.post("/v1/keys", json.dumps({"business": "Rotate Co"}),
+                             content_type="application/json").json()["key"]
+        q = {"pickup": WINDSOR_PICKUP, "stops": [STOP1]}
+        self.assertEqual(self.client.post("/v1/quotes", json.dumps(q),
+                         content_type="application/json", **self._h(k)).status_code, 200)
+        self.client.post("/v1/keys/rotate", json.dumps({"prefix": keys.prefix_of(k)}),
+                         content_type="application/json")
+        self.assertEqual(self.client.post("/v1/quotes", json.dumps(q),
+                         content_type="application/json", **self._h(k)).status_code, 401)

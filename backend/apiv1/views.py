@@ -12,9 +12,11 @@ from rest_framework.decorators import (
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from . import db, keys, pricing
+from . import audit, db, keys, lifecycle, pricing, scheduling, wallet
 from .authentication import ApiKeyAuthentication, require_scope
 from .errors import error_response
+
+STARTING_WALLET_CENTS = 10000  # new businesses get $100.00 of test funds
 
 _KEY_NS = uuid.UUID("a1b2c3d4-0000-4000-8000-000000000000")
 
@@ -184,6 +186,12 @@ def _create_errand(request):
     if exp < _now():
         return error_response("quote_expired", "Quote has expired; request a new one.", 409)
 
+    # scheduled deliveries (Sujith's module): validate the requested time window
+    ok, sched_err = scheduling.validate_scheduled_at(body.get("scheduled_at"))
+    if not ok:
+        return error_response("validation_failed", "Invalid request.", 400,
+                              {"scheduled_at": sched_err})
+
     # drop-offs: dropoffs[] (multi) or dropoff (single)
     dropoffs = body.get("dropoffs")
     if dropoffs is None and body.get("dropoff") is not None:
@@ -216,6 +224,22 @@ def _create_errand(request):
     stop_prices = [per_stop] * n
     stop_prices[-1] = round(charge_total - per_stop * (n - 1), 2)
 
+    # payment (Charan's wallet): charge the prepaid wallet, or fail cleanly if short
+    payment_method = (body.get("payment") or {}).get("method", "wallet")
+    paid = False
+    if payment_method == "wallet":
+        if not wallet.debit(owner, breakdown["amount_cents"]):
+            available = round(wallet.get_balance(owner) / 100, 2)
+            return error_response(
+                "insufficient_funds",
+                "Wallet balance is too low for this booking.", 402,
+                {"required": charge_total, "available": available, "currency": "CAD",
+                 "topup_url": "/v1/wallet/topup"})
+        paid = True
+
+    status = "pending" if paid else "pending_payment"  # paid -> awaiting dispatch
+    pay_status = "paid" if paid else "unpaid"
+
     created = []
     for index, d in enumerate(dropoffs):
         errand_id = str(uuid.uuid4())
@@ -224,7 +248,7 @@ def _create_errand(request):
             "business_owner_id": owner,
             "environment": environment,
             "test_mode": is_test,
-            "status": "pending_payment",
+            "status": status,
             "reference": d.get("reference") or body.get("reference"),
             "batch_id": batch_id,
             "batch_index": index if batch_id else None,
@@ -235,7 +259,9 @@ def _create_errand(request):
             "delivery_code": _delivery_code(),
             "price": stop_prices[index],
             "pricing": breakdown,
-            "payment": {"status": "unpaid", "method": (body.get("payment") or {}).get("method", "wallet")},
+            "payment": {"status": pay_status, "method": payment_method},
+            "driver": None,
+            "timeline": [{"status": status, "at": _now().isoformat()}],
             "metadata": body.get("metadata") or {},
             "created_at": _now(),
         }
@@ -327,31 +353,50 @@ def dashboard(request):
     return render(request, "dashboard.html")
 
 
+def _issue_key(business, scopes=("create", "read", "cancel")):
+    """Create a test key for a business, seed its wallet, and audit it."""
+    owner_id = str(uuid.uuid5(_KEY_NS, business.lower()))
+    plaintext = keys.generate_key("test")
+    db.api_keys().insert_one({
+        "id": str(uuid.uuid4()), "business_owner_id": owner_id, "business_name": business,
+        "name": "dashboard", "environment": "test",
+        "key_prefix": keys.prefix_of(plaintext), "key_hash": keys.hash_key(plaintext),
+        "scopes": list(scopes), "status": "active", "expires_at": None,
+        "created_at": _now(), "last_used_at": None,
+    })
+    # give a new business some test wallet funds so bookings can pay
+    if wallet.get_balance(owner_id) == 0:
+        wallet.topup(owner_id, STARTING_WALLET_CENTS)
+    audit.log("key.created", business=business, key_prefix=keys.prefix_of(plaintext))
+    return plaintext, owner_id
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def create_test_key(request):
     """Dashboard key creation — TEST keys only (live keys are issued by command)."""
-    body = request.data or {}
-    business = (body.get("business") or "Demo Business").strip()
-    owner_id = str(uuid.uuid5(_KEY_NS, business.lower()))
-    plaintext = keys.generate_key("test")
-    db.api_keys().insert_one({
-        "id": str(uuid.uuid4()),
-        "business_owner_id": owner_id,
-        "business_name": business,
-        "name": "dashboard",
-        "environment": "test",
-        "key_prefix": keys.prefix_of(plaintext),
-        "key_hash": keys.hash_key(plaintext),
-        "scopes": ["create", "read", "cancel"],
-        "status": "active",
-        "expires_at": None,
-        "created_at": _now(),
-        "last_used_at": None,
-    })
+    business = ((request.data or {}).get("business") or "Demo Business").strip()
+    plaintext, _ = _issue_key(business)
     return Response({"key": plaintext, "prefix": keys.prefix_of(plaintext),
                      "business": business, "environment": "test",
                      "scopes": ["create", "read", "cancel"]}, status=201)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def rotate_test_key(request):
+    """Rotate a key: issue a new one for the same business and revoke the old one."""
+    prefix = (request.data or {}).get("prefix")
+    old = db.api_keys().find_one({"key_prefix": prefix})
+    if not old:
+        return error_response("errand_not_found", "No key with that prefix.", 404)
+    db.api_keys().update_one({"key_prefix": prefix},
+                             {"$set": {"status": "revoked", "revoked_at": _now()}})
+    audit.log("key.rotated", business=old.get("business_name"), key_prefix=prefix,
+              detail="old key revoked, new key issued")
+    plaintext, _ = _issue_key(old.get("business_name", "Demo Business"))
+    return Response({"key": plaintext, "prefix": keys.prefix_of(plaintext),
+                     "business": old.get("business_name"), "rotated_from": prefix}, status=201)
 
 
 @api_view(["POST"])
@@ -367,7 +412,117 @@ def revoke_test_key(request):
     )
     if result.matched_count == 0:
         return error_response("errand_not_found", "No active key with that prefix.", 404)
+    key = db.api_keys().find_one({"key_prefix": prefix})
+    audit.log("key.revoked", business=key.get("business_name") if key else None, key_prefix=prefix)
     return Response({"status": "revoked", "prefix": prefix})
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def audit_log(request):
+    """Recent key actions — created / rotated / revoked (supports secure API access)."""
+    return Response({"audit": audit.recent(20)})
+
+
+# --------------------------------------------------------------------------- #
+# Wallet (Charan)
+# --------------------------------------------------------------------------- #
+@api_view(["GET"])
+@authentication_classes([ApiKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def wallet_balance(request):
+    require_scope(request, "read")
+    owner = request.user.business_owner_id
+    return Response({"currency": "CAD", "balance": round(wallet.get_balance(owner) / 100, 2)})
+
+
+@api_view(["POST"])
+@authentication_classes([ApiKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def wallet_topup(request):
+    owner = request.user.business_owner_id
+    amount = (request.data or {}).get("amount", 50)
+    wallet.topup(owner, int(round(float(amount) * 100)))
+    return Response({"currency": "CAD", "balance": round(wallet.get_balance(owner) / 100, 2)})
+
+
+# --------------------------------------------------------------------------- #
+# Tracking, cancel, and a test-mode "advance" (Sai)
+# --------------------------------------------------------------------------- #
+def _owned(owner, errand_id):
+    return db.errands().find_one({"errand_id": errand_id, "business_owner_id": owner})
+
+
+@api_view(["GET"])
+@authentication_classes([ApiKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def track_errand(request, errand_id):
+    require_scope(request, "read")
+    doc = _owned(request.user.business_owner_id, errand_id)
+    if not doc:
+        return error_response("errand_not_found", "Errand not found.", 404)
+    return Response({
+        "errand_id": doc["errand_id"],
+        "status": doc["status"],
+        "driver": doc.get("driver"),
+        "timeline": doc.get("timeline", []),
+        "delivery_code": doc["delivery_code"],
+    })
+
+
+@api_view(["POST"])
+@authentication_classes([ApiKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def cancel_errand(request, errand_id):
+    require_scope(request, "cancel")
+    owner = request.user.business_owner_id
+    doc = _owned(owner, errand_id)
+    if not doc:
+        return error_response("errand_not_found", "Errand not found.", 404)
+    if not lifecycle.can_cancel(doc["status"]):
+        return error_response("cancel_not_allowed",
+                              "Can't cancel — the driver has already picked up (or it's finished).", 409)
+    fee_cents = lifecycle.cancellation_fee_cents(doc["status"], doc["pricing"]["amount_cents"])
+    refund_cents = 0
+    if doc["payment"]["status"] == "paid":
+        refund_cents = max(0, doc["pricing"]["amount_cents"] - fee_cents)
+        wallet.topup(owner, refund_cents)  # refund to wallet
+    db.errands().update_one({"errand_id": errand_id}, {"$set": {
+        "status": "cancelled",
+        "cancellation": {"fee": round(fee_cents / 100, 2), "refund": round(refund_cents / 100, 2),
+                         "from_stage": doc["status"]},
+    }})
+    return Response({"status": "cancelled",
+                     "fee": round(fee_cents / 100, 2),
+                     "refund": round(refund_cents / 100, 2)})
+
+
+@api_view(["POST"])
+@authentication_classes([ApiKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def advance_errand(request, errand_id):
+    """Test-mode helper: move a test errand one step forward through its lifecycle,
+    simulating the driver so tracking and webhooks can be exercised without a real driver."""
+    require_scope(request, "create")
+    owner = request.user.business_owner_id
+    doc = _owned(owner, errand_id)
+    if not doc:
+        return error_response("errand_not_found", "Errand not found.", 404)
+    order = lifecycle.ORDER
+    cur = doc["status"]
+    if cur not in order or cur == order[-1]:
+        return error_response("validation_failed", "Already at the final stage.", 400)
+    nxt = order[order.index(cur) + 1]
+    update = {"status": nxt}
+    # a simulated driver appears once the delivery is accepted
+    if nxt == "accepted" and not doc.get("driver"):
+        update["driver"] = {"name": "Sam O.", "vehicle": doc["vehicle_type"],
+                            "lat": 42.312, "lng": -83.03}
+    db.errands().update_one({"errand_id": errand_id}, {
+        "$set": update,
+        "$push": {"timeline": {"status": nxt, "at": _now().isoformat()}},
+    })
+    return Response({"errand_id": errand_id, "status": nxt})
 
 
 def _list_errands(request):
