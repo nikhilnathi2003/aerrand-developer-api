@@ -4,9 +4,6 @@
 **Business:** Aerrand Technologies Inc. (Business 3) | **Group:** 6
 **Team name:** Aerrand Group-6
 
-> Draft note: keep the final submission to 3 pages. Lines marked *(fill in)* or *(confirm)*
-> need the team to check or add something.
-
 ## 1. Project Details
 
 ### Challenge Description
@@ -94,7 +91,7 @@ other's pull requests, so each person also touches parts outside their main area
 
 | Member | GitHub | Role / main area |
 |--------|--------|------------------|
-| Nikhil Goud Nathi (Team Lead) | @nikhilnathi2003 | API keys, authentication, project coordination |
+| Nikhil Goud Nathi | @nikhilnathi2003 | API keys, authentication, integration |
 | Sujith Chitram | @sujithchitram24 | Price quotes and delivery booking |
 | Venkata Charan Sai Doniparthi | @charansai50 | Simple wallet payment and webhooks |
 | Sai Srinivas Uppara | @Lucky100704 | Tracking/cancellation, developer docs, test mode |
@@ -119,17 +116,16 @@ area, so it's easy to see who's doing what and that the load is even.
 
 ## 3. Team Agreements
 
-- **Primary contact:** Nikhil Goud Nathi (team lead). *(confirm)*
+- **Primary contact:** Nikhil Goud Nathi.
 - **Communication:** MS Teams, in the *Business 3 - Group 6* channel, with our GA Rustem
   Izmailov in the chat.
-- **Project management:** GitHub Issues and a GitHub Projects board. We've already set up the
-  repo and created 102 issues (one per requirement), labelled by priority and area and grouped
-  into phase milestones, all on the board.
+- **Project management:** a GitHub Projects board. We've set up the repo and broken the
+  requirements into tasks on the board, each with an owner and a status, grouped by area.
 - **Contingency planning:**
   - If a member drops the course, we split their open issues among the rest at the next sprint
     planning and tell the GA so scope can be adjusted.
   - If someone keeps missing meetings or deadlines, we talk to them directly first; if it keeps
-    happening the lead raises it with the GA and we rebalance the board so work isn't blocked.
+    happening we raise it with the GA and rebalance the board so work isn't blocked.
   - For academic honesty, all work goes through reviewed pull requests with a clear commit
     history, so each person's contribution is traceable. Anything suspicious gets raised with
     the GA and then the instructor.

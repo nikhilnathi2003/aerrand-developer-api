@@ -18,7 +18,7 @@ payments + safety by end of Oct, webhooks + test mode by mid Nov, final demo end
 | 3 (Oct 6–12) | Office hours, finalise the plan | Went to office hours and settled the API design. No code this week | Updated plan; notes | Scopes are create / read / cancel | Start the core build |
 | 4 (Oct 13–19) | Build the core: keys, pricing, booking | Built the API key system, pricing engine, quotes and create-delivery, and a developer dashboard | Commits Oct 16, 18, 19; demo | Scope grew — we added a proper dashboard | Wallet, tracking, webhooks |
 | 5 (Oct 20–26) | Wallet, tracking, webhooks + a real UI | Added the wallet, live tracking, cancellation rules and signed webhooks; rebuilt the UI into a developer portal; added safe-retry booking. Everyone added their module | Commits from all four (Oct 25, 26); live demo | We're a bit ahead of plan | Rate limiting, more tests |
-| 6 (Oct 27 – now) | Rate limiting, tidy up, prep the Week 7 eval | Added rate limiting; each of us added tests and a doc for our own area | Commits Oct 27; tests passing (90+) | — | Webhook delivery, API docs |
+| 6 (Oct 27 – now) | Rate limiting, tidy up, prep the Week 7 eval | Added rate limiting; each of us added tests and a doc for our own area | Commits Oct 27; tests passing (45) | — | Webhook delivery, API docs |
 
 ---
 
