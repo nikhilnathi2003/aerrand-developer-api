@@ -148,27 +148,20 @@
           <div class="result" id="keyOut"></div></div>
         <div class="card"><h3>2 · Price a route</h3><p class="d">The server computes the price from distance, stops, parcel sizes and tax. The caller can never send a price.</p>
           <label>Pickup location</label>
-          <select id="puSel">
-            <option data-lat="42.3149" data-lng="-83.0364" selected>Downtown Windsor</option>
-            <option data-lat="42.3060" data-lng="-83.0665">University of Windsor</option>
-            <option data-lat="42.2606" data-lng="-82.9962">Devonshire Mall</option>
-            <option data-lat="42.2756" data-lng="-82.9556">Windsor Airport (YQG)</option>
-            <option data-lat="42.2342" data-lng="-83.0699">St. Clair College</option>
-            <option data-lat="42.3300" data-lng="-82.9400">Riverside</option>
-            <option data-lat="42.3100" data-lng="-82.8960">Tecumseh</option>
-            <option data-lat="42.2200" data-lng="-83.0700">LaSalle</option>
-          </select>
+          <input id="puSel" list="places" value="Downtown Windsor" placeholder="Type an address or place in Windsor">
           <label>Drop-off location</label>
-          <select id="doSel">
-            <option data-lat="42.3149" data-lng="-83.0364">Downtown Windsor</option>
-            <option data-lat="42.3060" data-lng="-83.0665">University of Windsor</option>
-            <option data-lat="42.2606" data-lng="-82.9962" selected>Devonshire Mall</option>
-            <option data-lat="42.2756" data-lng="-82.9556">Windsor Airport (YQG)</option>
-            <option data-lat="42.2342" data-lng="-83.0699">St. Clair College</option>
-            <option data-lat="42.3300" data-lng="-82.9400">Riverside</option>
-            <option data-lat="42.3100" data-lng="-82.8960">Tecumseh</option>
-            <option data-lat="42.2200" data-lng="-83.0700">LaSalle</option>
-          </select>
+          <input id="doSel" list="places" value="Devonshire Mall" placeholder="Type an address or place in Windsor">
+          <datalist id="places">
+            <option>Downtown Windsor</option>
+            <option>University of Windsor</option>
+            <option>Devonshire Mall</option>
+            <option>Windsor Airport (YQG)</option>
+            <option>St. Clair College</option>
+            <option>Riverside</option>
+            <option>Tecumseh</option>
+            <option>LaSalle</option>
+          </datalist>
+          <span class="note">Pick a suggestion or type any Windsor address — we look up the coordinates.</span>
           <label>Parcels — small, medium, large</label><div class="row3"><input id="pSmall" value="2"><input id="pMedium" value="1"><input id="pLarge" value="0"></div>
           <button id="btnQuote" onclick="getQuote()" disabled>Get quote</button><div class="result" id="quoteOut"></div></div>
         <div class="card"><h3>3 · Create the delivery</h3><p class="d">Booking charges the wallet and emits events. Then track it live.</p>
@@ -253,7 +246,7 @@
 </div>
 
 <script>
-let API_KEY=null, QUOTE_ID=null, KEY_PREFIX=null, ERRAND_ID=null, BUSINESS="";
+let API_KEY=null, QUOTE_ID=null, KEY_PREFIX=null, ERRAND_ID=null, BUSINESS="", PICKUP=null, DROP=null;
 const $=id=>document.getElementById(id);
 const money=n=>"$"+Number(n).toFixed(2);
 const show=(el,h)=>{el.innerHTML=h;el.classList.add("show");};
@@ -333,10 +326,16 @@ async function topup(){
 }
 
 /* pricing (Sujith) */
+async function geocodeAddr(q){ const r=await api("/v1/geocode","POST",{query:q}); return r.ok?r.data:null; }
 async function getQuote(){
-  const pu=$("puSel").selectedOptions[0], ds=$("doSel").selectedOptions[0];
-  const stop={lat:ds.dataset.lat,lng:ds.dataset.lng,parcels:{small:+$("pSmall").value||0,medium:+$("pMedium").value||0,large:+$("pLarge").value||0}};
-  const r=await api("/v1/quotes","POST",{pickup:{lat:pu.dataset.lat,lng:pu.dataset.lng},stops:[stop]});
+  show($("quoteOut"),'<span class="note">Looking up the addresses…</span>');
+  const pu=await geocodeAddr($("puSel").value);
+  if(!pu) return fail($("quoteOut"),"Couldn't find the pickup location near Windsor.");
+  const ds=await geocodeAddr($("doSel").value);
+  if(!ds) return fail($("quoteOut"),"Couldn't find the drop-off location near Windsor.");
+  PICKUP=pu; DROP=ds;
+  const stop={lat:ds.lat,lng:ds.lng,parcels:{small:+$("pSmall").value||0,medium:+$("pMedium").value||0,large:+$("pLarge").value||0}};
+  const r=await api("/v1/quotes","POST",{pickup:{lat:pu.lat,lng:pu.lng},stops:[stop]});
   if(!r.ok) return fail($("quoteOut"),(r.data.error&&r.data.error.message)||("Error "+r.status));
   QUOTE_ID=r.data.quote_id; const d=r.data;
   show($("quoteOut"),kv("Base (stops)",money(d.dropBaseTotal))+kv("Distance ("+d.routeKm+" km)",money(d.distanceCharge))+kv("Parcel add-ons",money(d.sizeAddOnTotal))+kv("Pre-tax",money(d.routePrice))+kv("HST (13%)",money(d.hst))+'<div class="kv"><span>Total (tax in)</span><b class="total">'+money(d.chargeTotal)+'</b></div><div class="note">Recommended vehicle: '+d.recommendedVehicle+'</div>');
@@ -345,8 +344,8 @@ async function getQuote(){
 
 /* create + tracking (Sai) */
 async function createErrand(){
-  const pu=$("puSel").selectedOptions[0], ds=$("doSel").selectedOptions[0];
-  const body={quote_id:QUOTE_ID,pickup:{lat:pu.dataset.lat,lng:pu.dataset.lng},dropoff:{lat:ds.dataset.lat,lng:ds.dataset.lng,contact:{name:$("rName").value,phone_number:$("rPhone").value},preference:"leave_at_door"}};
+  if(!PICKUP||!DROP) return fail($("errandOut"),"Get a quote first.");
+  const body={quote_id:QUOTE_ID,pickup:{lat:PICKUP.lat,lng:PICKUP.lng},dropoff:{lat:DROP.lat,lng:DROP.lng,contact:{name:$("rName").value,phone_number:$("rPhone").value},preference:"leave_at_door"}};
   if($("schedAt").value) body.scheduled_at=new Date($("schedAt").value).toISOString();
   const r=await api("/v1/errands","POST",body);
   if(!r.ok) return fail($("errandOut"),(r.data.error&&r.data.error.message)||("Error "+r.status));

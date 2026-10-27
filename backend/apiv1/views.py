@@ -12,7 +12,7 @@ from rest_framework.decorators import (
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from . import audit, db, idempotency, keys, lifecycle, pricing, scheduling, wallet, webhooks
+from . import audit, db, geocoding, idempotency, keys, lifecycle, pricing, scheduling, wallet, webhooks
 from .authentication import ApiKeyAuthentication, require_scope
 from .errors import error_response
 
@@ -93,6 +93,20 @@ def service_areas(request):
 # --------------------------------------------------------------------------- #
 # POST /v1/quotes  — route quote
 # --------------------------------------------------------------------------- #
+@api_view(["POST"])
+@authentication_classes([ApiKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def geocode_address(request):
+    """Turn a typed address/place into coordinates (used by the portal's location fields)."""
+    require_scope(request, "read")
+    result = geocoding.geocode((request.data or {}).get("query", ""))
+    if not result:
+        return error_response("address_not_found",
+                              "Couldn't find that address near Windsor. Try a place like "
+                              "\"University of Windsor\" or a Windsor street address.", 422)
+    return Response(result)
+
+
 @api_view(["POST"])
 @authentication_classes([ApiKeyAuthentication])
 @permission_classes([IsAuthenticated])

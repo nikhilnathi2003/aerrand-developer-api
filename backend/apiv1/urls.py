@@ -13,6 +13,7 @@ urlpatterns = [
     path("keys/audit", views.audit_log, name="audit-log"),
 
     # pricing + booking (Sujith)
+    path("geocode", views.geocode_address, name="geocode"),
     path("quotes", views.quotes, name="quotes"),
     path("errands", views.errands_collection, name="errands"),
     path("errands/<str:errand_id>", views.get_errand, name="get-errand"),
