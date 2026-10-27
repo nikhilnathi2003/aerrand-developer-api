@@ -172,8 +172,8 @@
           <div class="card"><h3>Driver on the map</h3>
             <div class="mapwrap" id="mapBox"></div>
             <div class="driver-card" id="driverCard"></div>
-            <button class="sm" onclick="advance()">Advance (simulate driver)</button>
-            <button class="ghost sm" onclick="cancelErrand()">Cancel delivery</button>
+            <button class="sm" id="btnAdvance" onclick="advance()">Advance (simulate driver)</button>
+            <button class="ghost sm" id="btnCancel" onclick="cancelErrand()">Cancel delivery</button>
             <div class="note" id="trackMsg"></div>
           </div>
           <div class="card"><h3>Status timeline</h3><div id="trackMeta"></div><ul class="tl" id="timeline"></ul></div>
@@ -351,6 +351,10 @@ function renderTrack(t){
   else $("driverCard").innerHTML='<div class="note" style="margin:0">No driver assigned yet — advance to dispatch.</div>';
   $("trackMeta").innerHTML=kv("Status","<b>"+t.status+"</b>")+kv("Handover code",t.delivery_code);
   $("timeline").innerHTML=(t.timeline||[]).map(s=>'<li><b>'+s.status+'</b> · '+s.at.slice(11,19)+'</li>').join("");
+  // disable actions that no longer apply (finished or past pickup)
+  const terminal=(t.status==="delivered"||t.status==="cancelled");
+  $("btnAdvance").disabled=terminal;
+  $("btnCancel").disabled=terminal||["picked_up","in_transit","arrived_dropoff"].includes(t.status);
 }
 async function advance(){
   const r=await api("/v1/errands/"+ERRAND_ID+"/advance","POST",{});
@@ -360,7 +364,7 @@ async function advance(){
 }
 async function cancelErrand(){
   const r=await api("/v1/errands/"+ERRAND_ID+"/cancel","POST",{});
-  if(r.status===409){$("trackMsg").innerHTML='<b style="color:var(--err)">Can\'t cancel</b> — the driver has already picked up (rule enforced).';return;}
+  if(r.status===409){$("trackMsg").innerHTML='<b style="color:var(--err)">'+((r.data.error&&r.data.error.message)||"Can't cancel this delivery.")+'</b>';refreshTrack();return;}
   if(r.ok){$("trackMsg").innerHTML='<b style="color:var(--violet)">Cancelled.</b> Fee '+money(r.data.fee)+', refunded '+money(r.data.refund)+' to the wallet.'; refreshTrack(); loadWallet(); loadEvents(); toast("Cancelled · refunded "+money(r.data.refund));}
 }
 

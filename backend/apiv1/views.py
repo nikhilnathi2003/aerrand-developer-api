@@ -339,7 +339,7 @@ def _errand_response(doc):
 def _batch_response(docs, breakdown, batch_id):
     return {
         "batch_id": batch_id,
-        "status": "pending_payment",
+        "status": docs[0]["status"],
         "stop_count": len(docs),
         "test_mode": docs[0]["test_mode"],
         "created_at": docs[0]["created_at"].isoformat(),
@@ -510,8 +510,14 @@ def cancel_errand(request, errand_id):
     if not doc:
         return error_response("errand_not_found", "Errand not found.", 404)
     if not lifecycle.can_cancel(doc["status"]):
-        return error_response("cancel_not_allowed",
-                              "Can't cancel — the driver has already picked up (or it's finished).", 409)
+        st = doc["status"]
+        if st == "cancelled":
+            msg = "This delivery is already cancelled."
+        elif st == "delivered":
+            msg = "This delivery is already delivered, so it can't be cancelled."
+        else:
+            msg = "Can't cancel — the driver has already picked up the parcel."
+        return error_response("cancel_not_allowed", msg, 409)
     fee_cents = lifecycle.cancellation_fee_cents(doc["status"], doc["pricing"]["amount_cents"])
     refund_cents = 0
     if doc["payment"]["status"] == "paid":
@@ -570,8 +576,10 @@ def advance_errand(request, errand_id):
         return error_response("errand_not_found", "Errand not found.", 404)
     order = lifecycle.ORDER
     cur = doc["status"]
+    if cur == "cancelled":
+        return error_response("validation_failed", "This delivery was cancelled.", 400)
     if cur not in order or cur == order[-1]:
-        return error_response("validation_failed", "Already at the final stage.", 400)
+        return error_response("validation_failed", "This delivery is already delivered.", 400)
     nxt = order[order.index(cur) + 1]
     update = {"status": nxt}
     # simulate the driver moving from pickup toward the drop-off

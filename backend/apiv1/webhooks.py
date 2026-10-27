@@ -18,8 +18,9 @@ from . import db
 SIGNING_SECRET = "whsec_demo_secret"
 
 EVENT_CATALOG = [
-    "errand.created", "errand.paid", "errand.accepted", "errand.arrived",
-    "errand.picked_up", "errand.in_transit", "errand.delivered", "errand.cancelled",
+    "errand.created", "errand.paid", "errand.broadcasted", "errand.accepted",
+    "errand.arrived", "errand.picked_up", "errand.in_transit",
+    "errand.arrived_dropoff", "errand.delivered", "errand.cancelled",
 ]
 
 
