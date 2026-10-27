@@ -195,18 +195,10 @@
 
       <!-- WALLET -->
       <section class="page" id="p-wallet">
-        <div class="cards" style="grid-template-columns:repeat(3,1fr)">
-          <div class="metric"><div class="l">Balance</div><div class="v" id="wBig" style="color:var(--violet);font-size:30px">—</div></div>
-          <div class="metric"><div class="l">Total added</div><div class="v pos" id="wAdded">—</div></div>
-          <div class="metric"><div class="l">Total spent</div><div class="v neg" id="wSpent">—</div></div>
-        </div>
-        <div class="card"><h3>Top up the wallet</h3>
-          <p class="d">Bookings charge this balance; cancellations refund to it.</p>
-          <div class="row3" style="max-width:380px">
-            <button class="ghost sm" onclick="topup(25)">+ $25</button>
-            <button class="ghost sm" onclick="topup(50)">+ $50</button>
-            <button class="ghost sm" onclick="topup(100)">+ $100</button>
-          </div></div>
+        <div class="card"><h3>Wallet balance</h3>
+          <div style="font-size:38px;font-weight:800;color:var(--violet);letter-spacing:-1px" id="wBig">—</div>
+          <button class="sm" onclick="topup()">Top up $50</button>
+          <span class="note">Bookings charge this balance; cancellations refund to it.</span></div>
         <div class="card"><h3>Transaction statement</h3>
           <table><thead><tr><th>Type</th><th>Note</th><th>When</th><th style="text-align:right">Amount</th></tr></thead>
           <tbody id="txnRows"><tr><td colspan="4" class="empty">No transactions yet.</td></tr></tbody></table></div>
@@ -315,7 +307,7 @@ async function revokeKey(){
 /* wallet (Charan) */
 async function loadWallet(){
   if(!API_KEY){
-    $("wBig").textContent="—"; $("wAdded").textContent="—"; $("wSpent").textContent="—";
+    $("wBig").textContent="—";
     $("txnRows").innerHTML='<tr><td colspan="4" class="empty">Generate a key on the “Create delivery” page first — the wallet belongs to that business.</td></tr>';
     return;
   }
@@ -323,20 +315,14 @@ async function loadWallet(){
   $("walletChip").textContent="Wallet "+money(r.data.balance);
   $("mWallet").textContent=money(r.data.balance); $("wBig").textContent=money(r.data.balance);
   const tx=r.data.transactions||[];
-  let added=0, spent=0;
-  tx.forEach(t=>{ if(t.kind==="topup") added+=t.amount; else if(t.kind==="charge") spent+=-t.amount; });
-  $("wAdded").textContent="+"+money(added);
-  $("wSpent").textContent="-"+money(spent);
-  const label={topup:"Top-up",charge:"Charge",refund:"Refund"};
-  $("txnRows").innerHTML = tx.length? tx.map(t=>'<tr><td><span class="badge">'+(label[t.kind]||t.kind)+'</span></td><td>'+t.note+'</td><td>'+t.at.slice(5,16).replace("T"," ")+'</td><td style="text-align:right" class="'+(t.amount<0?'neg':'pos')+'">'+(t.amount<0?'':'+')+money(t.amount)+'</td></tr>').join("")
+  $("txnRows").innerHTML = tx.length? tx.map(t=>'<tr><td><span class="badge">'+t.kind+'</span></td><td>'+t.note+'</td><td>'+t.at.slice(5,16).replace("T"," ")+'</td><td style="text-align:right" class="'+(t.amount<0?'neg':'pos')+'">'+(t.amount<0?'':'+')+money(t.amount)+'</td></tr>').join("")
     : '<tr><td colspan="4" class="empty">No transactions yet.</td></tr>';
 }
-async function topup(amount){
-  amount=amount||50;
+async function topup(){
   if(!API_KEY){ toast("Generate a key first — on the “Create delivery” page"); return; }
-  const r=await api("/v1/wallet/topup","POST",{amount});
+  const r=await api("/v1/wallet/topup","POST",{amount:50});
   if(!r.ok){ toast("Top-up failed ("+((r.data.error&&r.data.error.message)||r.status)+")"); return; }
-  loadWallet(); toast("Topped up "+money(amount));
+  loadWallet(); toast("Topped up $50.00");
 }
 
 /* pricing (Sujith) */
@@ -363,7 +349,7 @@ async function createErrand(){
   if($("schedAt").value) body.scheduled_at=new Date($("schedAt").value).toISOString();
   const r=await api("/v1/errands","POST",body);
   if(!r.ok) return fail($("errandOut"),(r.data.error&&r.data.error.message)||("Error "+r.status));
-  const e=r.data; ERRAND_ID=e.errand_id;
+  const e=r.data; ERRAND_ID=e.errand_id; $("trackMsg").innerHTML="";
   show($("errandOut"),'<div class="pill">'+(e.test_mode?"TEST · ":"")+e.status+'</div>'+kv("Errand ID",'<span class="mono">'+e.errand_id+'</span>')+kv("Handover code","<b>"+e.delivery_code+"</b>")+kv("Charged to wallet",money(e.pricing.charge_total))+'<div class="note">Opening live tracking…</div>');
   loadWallet(); toast("Delivery created · wallet charged "+money(e.pricing.charge_total)); setTimeout(()=>{nav("tracking");},700);
 }
@@ -399,7 +385,7 @@ function renderTrack(t){
   // disable actions that no longer apply (finished or past pickup)
   const terminal=(t.status==="delivered"||t.status==="cancelled");
   $("btnAdvance").disabled=terminal;
-  $("btnCancel").disabled=terminal||["picked_up","in_transit","arrived_dropoff"].includes(t.status);
+  $("btnCancel").disabled=terminal;
 }
 async function advance(){
   const r=await api("/v1/errands/"+ERRAND_ID+"/advance","POST",{});
@@ -422,7 +408,7 @@ async function loadErrands(){
   $("ovDeliv").innerHTML=list.length?list.slice(0,5).map(row).join(""):'<tr><td colspan="3" class="empty">Nothing yet.</td></tr>';
   $("delivRows").innerHTML=list.length?list.map(e=>'<tr><td><b>'+e.delivery_code+'</b> '+(e.test_mode?'<span class="badge">TEST</span>':'')+'</td><td>'+(e.reference||"—")+'</td><td>'+e.status+'</td><td>'+e.vehicle_type+'</td><td style="text-align:right">'+money(e.pricing.charge_total)+'</td><td><button class="ghost sm" style="margin:0" onclick="track(\''+e.errand_id+'\')">Track</button></td></tr>').join(""):'<tr><td colspan="6" class="empty">No deliveries yet.</td></tr>';
 }
-function track(id){ ERRAND_ID=id; nav("tracking"); }
+function track(id){ if(id!==ERRAND_ID) $("trackMsg").innerHTML=""; ERRAND_ID=id; nav("tracking"); }
 
 /* webhooks (team) */
 async function loadEvents(){
