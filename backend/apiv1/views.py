@@ -12,7 +12,7 @@ from rest_framework.decorators import (
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from . import audit, db, geocoding, idempotency, keys, lifecycle, pricing, scheduling, wallet, webhooks
+from . import audit, db, eta, geocoding, idempotency, keys, lifecycle, pricing, scheduling, wallet, webhooks
 from .authentication import ApiKeyAuthentication, require_scope
 from .errors import error_response
 
@@ -500,8 +500,7 @@ def track_errand(request, errand_id):
     driver = doc.get("driver")
     eta_min = None
     if driver and doc["status"] not in ("delivered", "cancelled"):
-        remaining_km = pricing.haversine_km(driver, doc["dropoff"]) * 1.3
-        eta_min = max(1, round(remaining_km / 0.4))  # ~24 km/h
+        eta_min = eta.estimate_minutes(driver, doc["dropoff"])
     return Response({
         "errand_id": doc["errand_id"],
         "status": doc["status"],
@@ -524,15 +523,16 @@ def cancel_errand(request, errand_id):
     if not doc:
         return error_response("errand_not_found", "Errand not found.", 404)
     if not lifecycle.can_cancel(doc["status"]):
-        st = doc["status"]
-        if st == "cancelled":
-            msg = "This delivery is already cancelled."
-        elif st == "delivered":
-            msg = "This delivery is already delivered, so it can't be cancelled."
-        else:
-            msg = "Can't cancel — the driver has already picked up the parcel."
-        return error_response("cancel_not_allowed", msg, 409)
-    fee_cents = lifecycle.cancellation_fee_cents(doc["status"], doc["pricing"]["amount_cents"])
+        msg = {
+            "picked_up": "Can't cancel — the driver has already picked up the parcel.",
+            "in_transit": "Can't cancel — the driver is on the way to the drop-off.",
+            "arrived_dropoff": "Can't cancel — the driver has arrived at the drop-off.",
+            "delivered": "This delivery is already delivered, so it can't be cancelled.",
+            "cancelled": "This delivery is already cancelled.",
+        }.get(doc["status"], "Can't cancel at this stage.")
+        return error_response("cancellation_not_allowed", msg, 409)
+    from_stage = doc["status"]
+    fee_cents = lifecycle.cancellation_fee_cents(from_stage, doc["pricing"]["amount_cents"])
     refund_cents = 0
     if doc["payment"]["status"] == "paid":
         refund_cents = max(0, doc["pricing"]["amount_cents"] - fee_cents)
@@ -540,13 +540,14 @@ def cancel_errand(request, errand_id):
     db.errands().update_one({"errand_id": errand_id}, {"$set": {
         "status": "cancelled",
         "cancellation": {"fee": round(fee_cents / 100, 2), "refund": round(refund_cents / 100, 2),
-                         "from_stage": doc["status"]},
+                         "from_stage": from_stage},
     }})
     doc["status"] = "cancelled"
     webhooks.record_event(owner, "errand.cancelled", doc)
     return Response({"status": "cancelled",
                      "fee": round(fee_cents / 100, 2),
-                     "refund": round(refund_cents / 100, 2)})
+                     "refund": round(refund_cents / 100, 2),
+                     "from_stage": from_stage})
 
 
 # --------------------------------------------------------------------------- #
@@ -592,8 +593,10 @@ def advance_errand(request, errand_id):
     cur = doc["status"]
     if cur == "cancelled":
         return error_response("validation_failed", "This delivery was cancelled.", 400)
-    if cur not in order or cur == order[-1]:
+    if cur == order[-1]:
         return error_response("validation_failed", "This delivery is already delivered.", 400)
+    if cur not in order:
+        return error_response("validation_failed", f"Unknown status '{cur}'.", 400)
     nxt = order[order.index(cur) + 1]
     update = {"status": nxt}
     # simulate the driver moving from pickup toward the drop-off
