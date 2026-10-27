@@ -293,6 +293,11 @@ async function revokeKey(){
 
 /* wallet (Charan) */
 async function loadWallet(){
+  if(!API_KEY){
+    $("wBig").textContent="—";
+    $("txnRows").innerHTML='<tr><td colspan="4" class="empty">Generate a key on the “Create delivery” page first — the wallet belongs to that business.</td></tr>';
+    return;
+  }
   const r=await api("/v1/wallet","GET"); if(!r.ok)return;
   $("walletChip").textContent="Wallet "+money(r.data.balance);
   $("mWallet").textContent=money(r.data.balance); $("wBig").textContent=money(r.data.balance);
@@ -300,7 +305,12 @@ async function loadWallet(){
   $("txnRows").innerHTML = tx.length? tx.map(t=>'<tr><td><span class="badge">'+t.kind+'</span></td><td>'+t.note+'</td><td>'+t.at.slice(5,16).replace("T"," ")+'</td><td style="text-align:right" class="'+(t.amount<0?'neg':'pos')+'">'+(t.amount<0?'':'+')+money(t.amount)+'</td></tr>').join("")
     : '<tr><td colspan="4" class="empty">No transactions yet.</td></tr>';
 }
-async function topup(){ await api("/v1/wallet/topup","POST",{amount:50}); loadWallet(); toast("Topped up $50.00"); }
+async function topup(){
+  if(!API_KEY){ toast("Generate a key first — on the “Create delivery” page"); return; }
+  const r=await api("/v1/wallet/topup","POST",{amount:50});
+  if(!r.ok){ toast("Top-up failed ("+((r.data.error&&r.data.error.message)||r.status)+")"); return; }
+  loadWallet(); toast("Topped up $50.00");
+}
 
 /* pricing (Sujith) */
 async function getQuote(){
