@@ -111,7 +111,7 @@
       <a data-p="webhooks" onclick="nav('webhooks')">⇄ Webhooks</a>
       <a data-p="docs" onclick="nav('docs')">⌨ API reference</a>
     </nav>
-    <div class="side-foot"><div id="apiStatus" style="margin-bottom:9px;font-weight:600">● checking…</div><b>Business 3 · Group 6</b><br>Sandbox environment<br>api.aerrand.com/v1</div>
+    <div class="side-foot"><b>Business 3 · Group 6</b></div>
   </aside>
 
   <div class="main">
@@ -137,13 +137,6 @@
         <div class="two">
           <div class="card"><h3>Recent deliveries</h3><table><thead><tr><th>Code</th><th>Status</th><th style="text-align:right">Price</th></tr></thead><tbody id="ovDeliv"><tr><td colspan="3" class="empty">Nothing yet — create a delivery to begin.</td></tr></tbody></table></div>
           <div class="card"><h3>Recent events</h3><table><thead><tr><th>Event</th><th>Status</th></tr></thead><tbody id="ovEvents"><tr><td colspan="2" class="empty">No events yet.</td></tr></tbody></table></div>
-        </div>
-        <div class="card"><h3>Build highlights</h3>
-          <div class="kv"><span>API keys — hashed storage, rotation, instant revoke, audit log</span><b class="pill ok">live</b></div>
-          <div class="kv"><span>Server-side pricing — caller can never set the price</span><b class="pill ok">live</b></div>
-          <div class="kv"><span>Prepaid wallet — atomic charge, refunds, full statement</span><b class="pill ok">live</b></div>
-          <div class="kv"><span>Live driver tracking — location, ETA, timeline</span><b class="pill ok">live</b></div>
-          <div class="kv"><span>Webhooks — signed events for every lifecycle change</span><b class="pill ok">live</b></div>
         </div>
       </section>
 
@@ -409,17 +402,6 @@ const SAMPLES={
 function lang(l){CURLANG=l;$("codeBlock").innerHTML=SAMPLES[l];document.querySelectorAll(".tabs button").forEach((b,i)=>b.classList.toggle("on",["curl","py","js"][i]===l));}
 lang("curl");
 
-/* live API status in the sidebar */
-(async()=>{
-  try{
-    const h=await (await fetch("/v1/health")).json();
-    const good=h.mongodb==="connected"&&h.redis==="connected";
-    $("apiStatus").innerHTML=good
-      ? '<span class="dot"></span>API online · DB · cache'
-      : '<span class="dot" style="background:var(--err)"></span>degraded';
-    $("apiStatus").style.color=good?"var(--ok)":"var(--err)";
-  }catch(e){ $("apiStatus").innerHTML='<span class="dot" style="background:var(--err)"></span>offline'; }
-})();
 </script>
 <div id="toast"></div>
 </body>
