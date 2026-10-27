@@ -109,7 +109,6 @@
       <a data-p="tracking" onclick="nav('tracking')">◉ Live tracking</a>
       <a data-p="wallet" onclick="nav('wallet')">▦ Wallet</a>
       <a data-p="webhooks" onclick="nav('webhooks')">⇄ Webhooks</a>
-      <a data-p="docs" onclick="nav('docs')">⌨ API reference</a>
     </nav>
     <div class="side-foot"><b>Business 3 · Group 6</b></div>
   </aside>
@@ -233,21 +232,6 @@
         </div>
       </section>
 
-      <!-- DOCS -->
-      <section class="page" id="p-docs">
-        <div class="card"><h3>Quickstart</h3><p class="d">Three calls: get a key, price a route, create a delivery. Pick a language.</p>
-          <div class="tabs"><button class="on" onclick="lang('curl')">cURL</button><button onclick="lang('py')">Python</button><button onclick="lang('js')">JavaScript</button><button class="copy" style="margin-left:auto" onclick="copy($('codeBlock').innerText)">Copy</button></div>
-          <pre id="codeBlock"></pre></div>
-        <div class="card"><h3>Endpoints</h3><table><thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead><tbody>
-          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/keys · /keys/rotate · /keys/revoke</td><td>Key lifecycle</td></tr>
-          <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0">/v1/keys/audit</td><td>Audit log</td></tr>
-          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/quotes</td><td>Price a route</td></tr>
-          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/errands</td><td>Create a delivery</td></tr>
-          <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0">/v1/errands/{id}/tracking</td><td>Live tracking + ETA</td></tr>
-          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/errands/{id}/cancel</td><td>Cancel (fee rules)</td></tr>
-          <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0">/v1/wallet · /events</td><td>Wallet statement · webhook events</td></tr>
-        </tbody></table></div>
-      </section>
 
     </div>
   </div>
@@ -260,7 +244,7 @@ const money=n=>"$"+Number(n).toFixed(2);
 const show=(el,h)=>{el.innerHTML=h;el.classList.add("show");};
 const fail=(el,m)=>show(el,'<span class="err">'+m+'</span>');
 const kv=(k,v)=>'<div class="kv"><span>'+k+'</span><b>'+v+'</b></div>';
-const TITLES={overview:"Overview",create:"Create delivery",deliveries:"Deliveries",tracking:"Live tracking",wallet:"Wallet",webhooks:"Webhooks",docs:"API reference"};
+const TITLES={overview:"Overview",create:"Create delivery",deliveries:"Deliveries",tracking:"Live tracking",wallet:"Wallet",webhooks:"Webhooks"};
 let _tt; function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show");clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove("show"),2600);}
 function copy(txt){(navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast("Copied to clipboard")).catch(()=>toast("Copy not available"));}
 
@@ -274,7 +258,6 @@ function nav(p){
   if(p==="wallet")loadWallet();
   if(p==="webhooks")loadEvents();
   if(p==="tracking")refreshTrack();
-  if(p==="docs")lang(CURLANG);
 }
 
 async function api(path,method,body){
@@ -440,16 +423,6 @@ async function registerWebhook(){
   show($("whOut"),'<b style="color:var(--violet)">Endpoint added.</b> id '+r.data.id+' — events: '+r.data.events.join(", "));
   toast("Webhook endpoint added");
 }
-
-/* docs code samples */
-let CURLANG="curl";
-const SAMPLES={
- curl:'<span class="c"># 1. issue a key, 2. quote, 3. create</span>\ncurl -s api.aerrand.com/v1/quotes \\\n  -H <span class="s">"Authorization: Bearer ak_test_…"</span> \\\n  -d <span class="s">\'{"pickup":{"lat":"42.31","lng":"-83.03"},\n      "stops":[{"lat":"42.28","lng":"-82.99","parcels":{"small":2}}]}\'</span>\n\ncurl -s api.aerrand.com/v1/errands \\\n  -H <span class="s">"Authorization: Bearer ak_test_…"</span> \\\n  -d <span class="s">\'{"quote_id":"qt_…","dropoff":{…}}\'</span>',
- py:'<span class="k">import</span> requests\nh = {<span class="s">"Authorization"</span>: <span class="s">"Bearer ak_test_…"</span>}\n\nq = requests.post(<span class="s">"https://api.aerrand.com/v1/quotes"</span>, headers=h,\n    json={<span class="s">"pickup"</span>:{…}, <span class="s">"stops"</span>:[{…}]}).json()\n\ne = requests.post(<span class="s">"https://api.aerrand.com/v1/errands"</span>, headers=h,\n    json={<span class="s">"quote_id"</span>: q[<span class="s">"quote_id"</span>], <span class="s">"dropoff"</span>:{…}}).json()\n<span class="k">print</span>(e[<span class="s">"errand_id"</span>], e[<span class="s">"delivery_code"</span>])',
- js:'<span class="k">const</span> h = { Authorization: <span class="s">"Bearer ak_test_…"</span> };\n\n<span class="k">const</span> q = <span class="k">await</span> fetch(<span class="s">"/v1/quotes"</span>, { method:<span class="s">"POST"</span>, headers:h,\n  body: JSON.stringify({ pickup:{…}, stops:[{…}] }) }).then(r=>r.json());\n\n<span class="k">const</span> e = <span class="k">await</span> fetch(<span class="s">"/v1/errands"</span>, { method:<span class="s">"POST"</span>, headers:h,\n  body: JSON.stringify({ quote_id:q.quote_id, dropoff:{…} }) }).then(r=>r.json());'
-};
-function lang(l){CURLANG=l;$("codeBlock").innerHTML=SAMPLES[l];document.querySelectorAll(".tabs button").forEach((b,i)=>b.classList.toggle("on",["curl","py","js"][i]===l));}
-lang("curl");
 
 </script>
 <div id="toast"></div>
