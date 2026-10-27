@@ -1,69 +1,65 @@
-# Evidence Trail — Aerrand Group-6
+# Evidence Trail — Aerrand Group 6
 
-Project log kept from week 1: a **team log** plus a small **individual contribution log** per
-member. Weeks run Monday–Sunday. "Evidence" links to a commit, the board, or a demo.
+We've kept this log since week 1. It has a team log (what we planned vs what we
+actually did each week) and a short log per person for our own parts. Weeks run
+Monday to Sunday. "Evidence" points to a commit, the board, or the demo.
 
-Milestones: M1 Oct 4 (design) · M2 Oct 18 (core booking) · M3 Nov 1 (payments & safety) ·
-M4 Nov 15 (webhooks & test mode) · M5 Nov 30 (integration & demo).
+Milestones we set at the start: design done early Oct, core booking by ~Oct 19,
+payments + safety by end of Oct, webhooks + test mode by mid Nov, final demo end of Nov.
 
 ---
 
 ## Team log
 
-| Week | What we planned | What we built | Evidence | What changed | Next step |
-|------|-----------------|---------------|----------|--------------|-----------|
-| 1 (Sep 21–27) | Kickoff; understand the project | — (understanding) | Kickoff attended; overview + TRD received | – | Set up repo + plan |
-| 2 (Sep 28–Oct 4) | Set up project; plan; setup report | GitHub repo, project board, 102 issues, P1 report | Repo + board; `docs/P1-initial-setup-report.md` | – | Office hours; start building |
-| 3 (Oct 5–11) | Office hours; start Sprint 1 | Backend scaffold (Django + MongoDB + Redis); `/v1/health` | Commits; `docker compose up` | Scope set: mock data, build to `/v1/errands` | API keys |
-| 4 (Oct 12–18) | Core booking (M2): keys, pricing, create | API key system (hashed, scopes, revoke); server-side pricing engine; create delivery; developer console | Commits | Confirmed scopes = create/read/cancel per brief | Wallet, tracking |
-| 5 (Oct 19–25) | Wallet, tracking, cancel, webhooks + a real UI | Prepaid wallet (charge/refund/statement); live driver tracking (map + ETA); cancel-with-fee rules; signed webhooks; full developer **portal**; each teammate's module | Commits from all 4; live demo | Scope grew into a full portal; well ahead of M2 | Safety rails |
-| 6 (Oct 26–Nov 1) *(current)* | Safety rails (M3): idempotency, rate limiting; polish; Week-7 eval | Idempotency (replay-safe booking); UI polish; audit (36 tests, 17 edge cases); teammate tests + docs; rate limiting (in progress) | Commits from all 4; audit output | — | Webhook dispatcher (M4) |
-| 7 (Nov 2–8) | Webhook dispatcher + retries | _(to update)_ | | | Test-mode advance |
-| 8 (Nov 9–15) | Webhooks & test mode (M4) | _(to update)_ | | | Docs |
-| 9 (Nov 16–22) | OpenAPI docs; hardening | _(to update)_ | | | Dry run |
-| 10 (Nov 23–30) | Integration & final demo (M5) | _(to update)_ | | | Final demo |
+| Week | What we planned | What we actually did | Evidence | What changed | Next |
+|------|-----------------|----------------------|----------|--------------|------|
+| 1 (Sep 22–28) | Understand the project from the kickoff and set up the repo | Set up the GitHub repo and wrote the proposal, requirements and architecture notes | Repo + planning docs | — | Write the setup report, start building |
+| 2 (Sep 29–Oct 5) | Finish the P1 setup report, get the backend running | Wrote the P1 report; set up the Django backend with MongoDB + Redis and a health check | P1 report; `/v1/health` works | Decided to use mock data and build to the payloads doc | Build the keys and pricing |
+| 3 (Oct 6–12) | Office hours, finalise the plan | Went to office hours and settled the API design. No code this week | Updated plan; notes | Scopes are create / read / cancel | Start the core build |
+| 4 (Oct 13–19) | Build the core: keys, pricing, booking | Built the API key system, pricing engine, quotes and create-delivery, and a developer dashboard | Commits Oct 16, 18, 19; demo | Scope grew — we added a proper dashboard | Wallet, tracking, webhooks |
+| 5 (Oct 20–26) | Wallet, tracking, webhooks + a real UI | Added the wallet, live tracking, cancellation rules and signed webhooks; rebuilt the UI into a developer portal; added safe-retry booking. Everyone added their module | Commits from all four (Oct 25, 26); live demo | We're a bit ahead of plan | Rate limiting, more tests |
+| 6 (Oct 27 – now) | Rate limiting, tidy up, prep the Week 7 eval | Added rate limiting; each of us added tests and a doc for our own area | Commits Oct 27; tests passing (90+) | — | Webhook delivery, API docs |
 
 ---
 
-## Individual contribution logs
+## Our own logs
 
-### Nikhil Goud Nathi (lead · API keys + auth + integration)
+### Nikhil — API keys, authentication, portal
 
-| Week | My task | Evidence | Result | Next task |
-|------|---------|----------|--------|-----------|
-| 1 | Ask API-key questions at kickoff | Kickoff | Clarified scope | Set up repo |
-| 2 | Set up repo, board, 102 issues; draft setup report | Commits / board / P1 | Done | Scaffold backend |
-| 3 | Backend scaffold + `/v1/health` | Commits | Done | Key system |
-| 4 | Build the API key system (hash, scopes, revoke, rotation, audit) + auth + console | Commits | Done | Wallet/tracking |
-| 5 | Build the developer portal; wire wallet, tracking, webhooks into the API | Commits | Done | Safety rails |
-| 6 | Add idempotency; polish the portal; audit the whole codebase | Commits; 36 tests | In progress | Webhook dispatcher |
+| Week | What I did | Evidence | Done? |
+|------|------------|----------|-------|
+| 1 | Set up the repo and the planning docs | Commits | Yes |
+| 2 | Wrote the P1 report and got the Django backend running | Commits / P1 | Yes |
+| 4 | Built the API key system, auth and the developer console | Commits | Yes |
+| 5 | Built the developer portal and wired wallet/tracking/webhooks into the API | Commits | Yes |
+| 6 | Added rate limiting and safe-retry booking; went over the whole codebase | Commits | In progress |
 
-### Sujith Chitram (pricing · booking · scheduling)
+### Sujith — pricing, booking, scheduling
 
-| Week | My task | Evidence | Result | Next task |
-|------|---------|----------|--------|-----------|
-| 1–3 | Attend meetings; review pricing/booking requirements | Meetings | Done | Plan quotes |
-| 5 | Build the scheduled-delivery validation module | Commit (`scheduling.py`) | Done | Pricing tests |
-| 6 | Add pricing unit tests, a pricing & scheduling doc, and the vehicle-tier rule | Commits | In progress | Quote parity tests |
+| Week | What I did | Evidence | Done? |
+|------|------------|----------|-------|
+| 1–3 | Joined the meetings and went through the pricing/booking requirements | Meetings | Yes |
+| 4 | Helped with the pricing and create-delivery work | Commits | Yes |
+| 5 | Built the scheduled-delivery validation | Commit (`scheduling.py`) | Yes |
+| 6 | Added pricing tests, a pricing doc and the vehicle-tier rule | Commits | In progress |
 
-### Venkata Charan Sai Doniparthi (wallet · webhooks)
+### Charan — wallet, webhooks
 
-| Week | My task | Evidence | Result | Next task |
-|------|---------|----------|--------|-----------|
-| 1–3 | Attend meetings; review wallet/webhook requirements | Meetings | Done | Plan wallet |
-| 5 | Build the simple wallet module (balance, atomic debit, refund) | Commit (`wallet.py`) | Done | Wallet tests |
-| 6 | Add wallet-statement tests, a wallet & webhooks doc, and the webhook signature verifier | Commits | In progress | Wire top-up to Stripe (phase 2) |
+| Week | What I did | Evidence | Done? |
+|------|------------|----------|-------|
+| 1–3 | Joined the meetings and went through the wallet/webhook requirements | Meetings | Yes |
+| 5 | Built the simple wallet (balance, charge, refund) | Commit (`wallet.py`) | Yes |
+| 6 | Added wallet tests, a wallet/webhooks doc and the webhook verifier | Commits | In progress |
 
-### Sai Srinivas Uppara (tracking · cancellation)
+### Sai — tracking, cancellation
 
-| Week | My task | Evidence | Result | Next task |
-|------|---------|----------|--------|-----------|
-| 1–3 | Attend meetings; review tracking/cancellation requirements | Meetings | Done | Plan tracking |
-| 5 | Build the lifecycle + cancellation-rules module | Commit (`lifecycle.py`) | Done | Lifecycle tests |
-| 6 | Add lifecycle tests, a tracking & cancellation doc, and the ETA helper | Commits | In progress | Proof-of-delivery endpoint |
+| Week | What I did | Evidence | Done? |
+|------|------------|----------|-------|
+| 1–3 | Joined the meetings and went through the tracking/cancellation requirements | Meetings | Yes |
+| 5 | Built the lifecycle and cancellation rules | Commit (`lifecycle.py`) | Yes |
+| 6 | Added tracking tests, a tracking doc and the ETA helper | Commits | In progress |
 
 ---
 
-### How we keep this current
-Each week every person adds a row with a real Evidence link, and we move the matching issues on
-the project board to Done.
+We update this every week: each person adds a line with a real evidence link, and we
+move the matching card on the board to Done.
