@@ -29,24 +29,33 @@ def geocode(query):
     if not query or not query.strip():
         return None
     q = query.strip()
-    key = q.lower().replace(".", "").replace(",", " ")
-    key = " ".join(key.split())
+    key = " ".join(q.lower().replace(".", "").replace(",", " ").split())
     for name, (lat, lng) in PRESETS.items():
         if name in key:
             return {"lat": lat, "lng": lng, "label": q}
-    # fall back to OpenStreetMap Nominatim (free, no API key)
+    # fall back to OpenStreetMap Nominatim (free, no API key).
+    # Try with Windsor context first, then the raw query, so house addresses resolve too.
+    full = q if "windsor" in key else q + ", Windsor, Ontario"
+    for search in (full, q):
+        hit = _nominatim(search)
+        if hit:
+            return {**hit, "label": q}
+    return None
+
+
+def _nominatim(q):
     try:
         params = urllib.parse.urlencode({
-            "q": q + ", Windsor, Ontario, Canada",
-            "format": "json", "limit": "1",
-            "viewbox": _VIEWBOX, "bounded": "1",
+            "q": q, "format": "json", "limit": "1",
+            "countrycodes": "ca",
+            "viewbox": _VIEWBOX,   # bias toward Windsor (not a hard boundary)
         })
         url = "https://nominatim.openstreetmap.org/search?" + params
         req = urllib.request.Request(url, headers={"User-Agent": "aerrand-dev-portal/1.0"})
         with urllib.request.urlopen(req, timeout=4) as r:
             data = json.loads(r.read())
         if data:
-            return {"lat": float(data[0]["lat"]), "lng": float(data[0]["lon"]), "label": q}
+            return {"lat": float(data[0]["lat"]), "lng": float(data[0]["lon"])}
     except Exception:
         return None
     return None
