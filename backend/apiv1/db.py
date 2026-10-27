@@ -1,7 +1,13 @@
 """MongoDB access for the API's domain data (keys, quotes, errands).
 
 Everything goes through get_db() so tests can swap in an in-memory database.
+
+To run the app without installing MongoDB (e.g. a teammate trying it locally),
+set the environment variable INMEMORY_DB=1 — it uses an in-memory database
+instead. Data then lives only while the server is running.
 """
+import os
+
 from django.conf import settings
 
 _client = None
@@ -15,8 +21,13 @@ def set_db_for_tests(db):
 
 
 def get_db():
-    global _client
+    global _client, _db_override
     if _db_override is not None:
+        return _db_override
+    if os.environ.get("INMEMORY_DB") == "1":
+        import mongomock
+
+        _db_override = mongomock.MongoClient()["aerrand"]
         return _db_override
     if _client is None:
         import pymongo

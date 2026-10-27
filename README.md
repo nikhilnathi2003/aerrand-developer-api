@@ -22,6 +22,24 @@ Working endpoints: `POST /v1/quotes`, `POST /v1/errands` (single + multi-stop),
 Keys are issued by command (`python manage.py issue_key …`), stored only as a hash.
 Next: wallet payment, tracking, cancel, then webhooks.
 
+## Running the project (just Python — easiest)
+
+No Docker, MongoDB or Redis needed. You only need **Python 3** installed. From the repo root:
+
+**Mac / Linux:**
+```bash
+bash scripts/run-inmemory.sh
+```
+
+**Windows:** double-click `scripts\run-inmemory.bat` (or run it from a terminal).
+
+The first run sets up the environment automatically. When it says it's ready, open:
+
+- **http://127.0.0.1:8000/** — the developer portal
+
+It uses an in-memory database, so data lasts while the server is running (perfect for
+trying it out and for the demo). Stop it with `Ctrl+C`.
+
 ## Running the project (Docker)
 
 You need **Docker Desktop** installed (free: https://www.docker.com/products/docker-desktop).
