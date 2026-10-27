@@ -50,7 +50,7 @@
   .sec-h{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:2px 0 12px}
 
   label{display:block;font-size:11px;color:var(--muted);margin:10px 0 4px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
-  input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;color:var(--ink);background:#fff}
+  input,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;color:var(--ink);background:#fff}
   input:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px var(--lilac-bg)}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
   button{background:var(--violet);color:#fff;border:0;border-radius:10px;padding:10px 16px;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:14px;margin-right:8px}
@@ -147,8 +147,28 @@
           <button id="btnKey" onclick="genKey()">Generate test key</button>
           <div class="result" id="keyOut"></div></div>
         <div class="card"><h3>2 · Price a route</h3><p class="d">The server computes the price from distance, stops, parcel sizes and tax. The caller can never send a price.</p>
-          <label>Pickup (lat, lng)</label><div class="row"><input id="puLat" value="42.3149"><input id="puLng" value="-83.0364"></div>
-          <label>Drop-off (lat, lng)</label><div class="row"><input id="doLat" value="42.2789"><input id="doLng" value="-82.9912"></div>
+          <label>Pickup location</label>
+          <select id="puSel">
+            <option data-lat="42.3149" data-lng="-83.0364" selected>Downtown Windsor</option>
+            <option data-lat="42.3060" data-lng="-83.0665">University of Windsor</option>
+            <option data-lat="42.2606" data-lng="-82.9962">Devonshire Mall</option>
+            <option data-lat="42.2756" data-lng="-82.9556">Windsor Airport (YQG)</option>
+            <option data-lat="42.2342" data-lng="-83.0699">St. Clair College</option>
+            <option data-lat="42.3300" data-lng="-82.9400">Riverside</option>
+            <option data-lat="42.3100" data-lng="-82.8960">Tecumseh</option>
+            <option data-lat="42.2200" data-lng="-83.0700">LaSalle</option>
+          </select>
+          <label>Drop-off location</label>
+          <select id="doSel">
+            <option data-lat="42.3149" data-lng="-83.0364">Downtown Windsor</option>
+            <option data-lat="42.3060" data-lng="-83.0665">University of Windsor</option>
+            <option data-lat="42.2606" data-lng="-82.9962" selected>Devonshire Mall</option>
+            <option data-lat="42.2756" data-lng="-82.9556">Windsor Airport (YQG)</option>
+            <option data-lat="42.2342" data-lng="-83.0699">St. Clair College</option>
+            <option data-lat="42.3300" data-lng="-82.9400">Riverside</option>
+            <option data-lat="42.3100" data-lng="-82.8960">Tecumseh</option>
+            <option data-lat="42.2200" data-lng="-83.0700">LaSalle</option>
+          </select>
           <label>Parcels — small, medium, large</label><div class="row3"><input id="pSmall" value="2"><input id="pMedium" value="1"><input id="pLarge" value="0"></div>
           <button id="btnQuote" onclick="getQuote()" disabled>Get quote</button><div class="result" id="quoteOut"></div></div>
         <div class="card"><h3>3 · Create the delivery</h3><p class="d">Booking charges the wallet and emits events. Then track it live.</p>
@@ -314,8 +334,9 @@ async function topup(){
 
 /* pricing (Sujith) */
 async function getQuote(){
-  const stop={lat:$("doLat").value,lng:$("doLng").value,parcels:{small:+$("pSmall").value||0,medium:+$("pMedium").value||0,large:+$("pLarge").value||0}};
-  const r=await api("/v1/quotes","POST",{pickup:{lat:$("puLat").value,lng:$("puLng").value},stops:[stop]});
+  const pu=$("puSel").selectedOptions[0], ds=$("doSel").selectedOptions[0];
+  const stop={lat:ds.dataset.lat,lng:ds.dataset.lng,parcels:{small:+$("pSmall").value||0,medium:+$("pMedium").value||0,large:+$("pLarge").value||0}};
+  const r=await api("/v1/quotes","POST",{pickup:{lat:pu.dataset.lat,lng:pu.dataset.lng},stops:[stop]});
   if(!r.ok) return fail($("quoteOut"),(r.data.error&&r.data.error.message)||("Error "+r.status));
   QUOTE_ID=r.data.quote_id; const d=r.data;
   show($("quoteOut"),kv("Base (stops)",money(d.dropBaseTotal))+kv("Distance ("+d.routeKm+" km)",money(d.distanceCharge))+kv("Parcel add-ons",money(d.sizeAddOnTotal))+kv("Pre-tax",money(d.routePrice))+kv("HST (13%)",money(d.hst))+'<div class="kv"><span>Total (tax in)</span><b class="total">'+money(d.chargeTotal)+'</b></div><div class="note">Recommended vehicle: '+d.recommendedVehicle+'</div>');
@@ -324,7 +345,8 @@ async function getQuote(){
 
 /* create + tracking (Sai) */
 async function createErrand(){
-  const body={quote_id:QUOTE_ID,pickup:{lat:$("puLat").value,lng:$("puLng").value},dropoff:{lat:$("doLat").value,lng:$("doLng").value,contact:{name:$("rName").value,phone_number:$("rPhone").value},preference:"leave_at_door"}};
+  const pu=$("puSel").selectedOptions[0], ds=$("doSel").selectedOptions[0];
+  const body={quote_id:QUOTE_ID,pickup:{lat:pu.dataset.lat,lng:pu.dataset.lng},dropoff:{lat:ds.dataset.lat,lng:ds.dataset.lng,contact:{name:$("rName").value,phone_number:$("rPhone").value},preference:"leave_at_door"}};
   if($("schedAt").value) body.scheduled_at=new Date($("schedAt").value).toISOString();
   const r=await api("/v1/errands","POST",body);
   if(!r.ok) return fail($("errandOut"),(r.data.error&&r.data.error.message)||("Error "+r.status));
