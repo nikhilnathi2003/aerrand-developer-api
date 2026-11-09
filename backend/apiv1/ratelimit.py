@@ -6,6 +6,7 @@ and hit 429 instead of overloading the service. The clock is injectable so the b
 is easy to test. In production the counter lives in Redis (shared across processes);
 wiring this into the request path and adding the Redis backend is the next step.
 """
+import os
 import time
 
 
@@ -32,3 +33,26 @@ class RateLimiter:
             "remaining": max(0, self.limit - count),
             "retry_after": 0 if allowed else reset_in,
         }
+
+
+# --------------------------------------------------------------------------- #
+# Shared limiter wired into the API request path.
+# Each API key gets RATE_LIMIT_PER_MIN requests per 60s (generous by default so
+# normal use never trips; override with the env var). Returns the same decision
+# dict as RateLimiter.check(); the view turns a disallowed decision into HTTP 429.
+# --------------------------------------------------------------------------- #
+_API_LIMIT = int(os.environ.get("RATE_LIMIT_PER_MIN", "120"))
+_shared = RateLimiter(_API_LIMIT, 60)
+
+
+def enforce(key):
+    return _shared.check(key)
+
+
+def headers(decision):
+    """Standard rate-limit headers to attach to the response."""
+    return {
+        "X-RateLimit-Limit": str(decision["limit"]),
+        "X-RateLimit-Remaining": str(decision["remaining"]),
+        "Retry-After": str(decision["retry_after"]),
+    }

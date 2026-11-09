@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from django.conf import settings
+from django.http import HttpResponse
 from django.shortcuts import render
 from rest_framework.decorators import (
     api_view,
@@ -12,7 +13,10 @@ from rest_framework.decorators import (
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from . import audit, db, eta, geocoding, idempotency, keys, lifecycle, pricing, scheduling, wallet, webhooks
+from . import (
+    addresses, audit, db, eta, geocoding, idempotency, keys, lifecycle, pricing,
+    proof, ratelimit, reports, scheduling, statements, wallet, webhooks,
+)
 from .authentication import ApiKeyAuthentication, require_scope
 from .errors import error_response
 
@@ -50,6 +54,21 @@ def _valid_point(obj):
         return True
     except (KeyError, TypeError, ValueError):
         return False
+
+
+def _rate_limited(request):
+    """Enforce the per-key request budget. Returns a 429 Response if over budget,
+    else None. The limiter is keyed by the authenticating key's prefix."""
+    record = getattr(request, "api_key", None)
+    key = (record or {}).get("key_prefix") or str(request.user.business_owner_id)
+    decision = ratelimit.enforce(key)
+    if decision["allowed"]:
+        return None
+    resp = error_response("rate_limited", "Too many requests — please slow down.", 429,
+                          {"retry_after_seconds": decision["retry_after"]})
+    for header, value in ratelimit.headers(decision).items():
+        resp[header] = value
+    return resp
 
 
 # --------------------------------------------------------------------------- #
@@ -112,6 +131,9 @@ def geocode_address(request):
 @permission_classes([IsAuthenticated])
 def quotes(request):
     require_scope(request, "read")
+    limited = _rate_limited(request)
+    if limited:
+        return limited
     body = request.data or {}
 
     pickup = body.get("pickup")
@@ -182,6 +204,9 @@ def errands_collection(request):
 
 def _create_errand(request):
     require_scope(request, "create")
+    limited = _rate_limited(request)
+    if limited:
+        return limited
     body = request.data or {}
     owner = request.user.business_owner_id
     environment = request.api_key["environment"]
@@ -465,9 +490,11 @@ def audit_log(request):
 def wallet_balance(request):
     require_scope(request, "read")
     owner = request.user.business_owner_id
+    balance_cents = wallet.get_balance(owner)
     return Response({
         "currency": "CAD",
-        "balance": round(wallet.get_balance(owner) / 100, 2),
+        "balance": round(balance_cents / 100, 2),
+        "low_balance": statements.is_low(balance_cents),
         "transactions": wallet.transactions(owner, 25),
     })
 
@@ -510,6 +537,7 @@ def track_errand(request, errand_id):
         "dropoff": {"lat": float(doc["dropoff"]["lat"]), "lng": float(doc["dropoff"]["lng"])},
         "timeline": doc.get("timeline", []),
         "delivery_code": doc["delivery_code"],
+        "proof_of_delivery": doc.get("proof_of_delivery"),
     })
 
 
@@ -624,3 +652,102 @@ def _list_errands(request):
     owner = request.user.business_owner_id
     docs = list(db.errands().find({"business_owner_id": owner}).sort("created_at", -1).limit(20))
     return Response({"errands": [_errand_response(d) for d in docs]})
+
+
+# --------------------------------------------------------------------------- #
+# Proof of delivery (Sai) — POST /v1/errands/{id}/proof
+# --------------------------------------------------------------------------- #
+@api_view(["POST"])
+@authentication_classes([ApiKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def errand_proof(request, errand_id):
+    """Confirm a delivery at the drop-off with the delivery code + recipient name."""
+    require_scope(request, "create")
+    owner = request.user.business_owner_id
+    doc = _owned(owner, errand_id)
+    if not doc:
+        return error_response("errand_not_found", "Errand not found.", 404)
+    if doc["status"] not in ("arrived_dropoff", "delivered"):
+        return error_response("proof_not_allowed",
+                              "Proof can only be captured once the driver has reached the drop-off.",
+                              409)
+    body = request.data or {}
+    recipient = (body.get("recipient_name") or "").strip()
+    if not recipient:
+        return error_response("validation_failed", "Invalid request.", 400,
+                              {"recipient_name": "recipient_name is required"})
+    if not proof.verify_code(doc["delivery_code"], body.get("delivery_code")):
+        return error_response("delivery_code_mismatch",
+                              "The delivery code does not match this delivery.", 422)
+
+    record = proof.build_record(recipient, body.get("note", ""), code_verified=True)
+    update = {"proof_of_delivery": record}
+    newly_delivered = doc["status"] != "delivered"
+    if newly_delivered:
+        update["status"] = "delivered"
+    db.errands().update_one({"errand_id": errand_id}, {
+        "$set": update,
+        "$push": {"timeline": {"status": "delivered", "at": _now().isoformat()}},
+    })
+    if newly_delivered:
+        doc["status"] = "delivered"
+        webhooks.record_event(owner, "errand.delivered", doc)
+    return Response({"errand_id": errand_id, "status": "delivered",
+                     "proof_of_delivery": record})
+
+
+# --------------------------------------------------------------------------- #
+# Saved address book (Sujith) — GET/POST /v1/addresses
+# --------------------------------------------------------------------------- #
+@api_view(["GET", "POST"])
+@authentication_classes([ApiKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def addresses_collection(request):
+    owner = request.user.business_owner_id
+    if request.method == "POST":
+        require_scope(request, "create")
+        body = request.data or {}
+        saved = addresses.save(owner, body.get("label", ""), body.get("address", ""))
+        if not saved:
+            return error_response("address_not_found",
+                                  "Couldn't find that address near Windsor.", 422)
+        return Response(saved, status=201)
+    require_scope(request, "read")
+    return Response({"addresses": addresses.list_for(owner)})
+
+
+# --------------------------------------------------------------------------- #
+# Wallet statement export (Charan) — GET /v1/wallet/statement.csv
+# --------------------------------------------------------------------------- #
+@api_view(["GET"])
+@authentication_classes([ApiKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def wallet_statement_csv(request):
+    require_scope(request, "read")
+    owner = request.user.business_owner_id
+    csv_text = statements.to_csv(wallet.transactions(owner, 200))
+    resp = HttpResponse(csv_text, content_type="text/csv")
+    resp["Content-Disposition"] = 'attachment; filename="wallet-statement.csv"'
+    return resp
+
+
+# --------------------------------------------------------------------------- #
+# Webhook delivery log (Lucky/team) — GET /v1/webhooks/deliveries
+# --------------------------------------------------------------------------- #
+@api_view(["GET"])
+@authentication_classes([ApiKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def webhook_deliveries(request):
+    require_scope(request, "read")
+    return Response({"deliveries": webhooks.recent_deliveries(request.user.business_owner_id, 25)})
+
+
+# --------------------------------------------------------------------------- #
+# Business reporting (team) — GET /v1/reports/summary
+# --------------------------------------------------------------------------- #
+@api_view(["GET"])
+@authentication_classes([ApiKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def reports_summary(request):
+    require_scope(request, "read")
+    return Response(reports.summary(request.user.business_owner_id))
