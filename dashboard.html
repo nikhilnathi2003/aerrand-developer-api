@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>aerrand · Developer Portal</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%235202d9'/><text x='16' y='23' font-size='19' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'>a</text></svg>">
+<style>
+  :root{
+    --violet:#5202d9; --violet-d:#4201ad; --lilac:#ccaaff; --lilac-bg:#f4eefe;
+    --ink:#0a0a0c; --ink-2:#2a2a33; --muted:#6b6b6b; --line:#e8e6ef;
+    --bg:#fafafb; --card:#ffffff; --ok:#15803d; --okbg:#eaf7ee; --err:#b91c1c;
+    --code:#17151f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Segoe UI",Inter,Roboto,Arial,sans-serif;line-height:1.5;font-size:14px}
+  a{color:var(--violet);text-decoration:none}
+  .app{display:flex;min-height:100vh}
+
+  /* sidebar */
+  .sidebar{width:230px;background:var(--card);border-right:1px solid var(--line);padding:18px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+  .logo{font-size:22px;font-weight:800;color:var(--violet);letter-spacing:-.5px;padding:4px 10px 16px}
+  .nav a{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px;color:var(--ink-2);font-weight:600;font-size:13.5px;margin-bottom:2px;cursor:pointer}
+  .nav a:hover{background:#f5f4f9}
+  .nav a.active{background:var(--lilac-bg);color:var(--violet-d)}
+  .nav svg{width:17px;height:17px}
+  .side-foot{margin-top:auto;padding:12px 11px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+  .side-foot b{color:var(--ink)}
+
+  /* main */
+  .main{flex:1;min-width:0}
+  .topbar{display:flex;align-items:center;gap:14px;padding:13px 28px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+  .topbar h1{font-size:17px;margin:0}
+  .top-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+  .chip{font-size:12px;font-weight:700;border-radius:20px;padding:5px 12px;background:var(--lilac-bg);color:var(--violet-d);border:1px solid var(--lilac)}
+  .chip.env{background:#eef6ee;color:var(--ok);border-color:#cfe9d4}
+  .chip.off{background:#f3f3f5;color:var(--muted);border-color:var(--line)}
+  .wrap{padding:24px 28px;max-width:1000px}
+  .page{display:none} .page.active{display:block}
+
+  /* cards + grid */
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+  .metric{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 16px}
+  .metric .l{font-size:11.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+  .metric .v{font-size:25px;font-weight:800;margin-top:6px;letter-spacing:-.6px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:18px}
+  .card h3{margin:0 0 3px;font-size:15px}
+  .card .d{color:var(--muted);font-size:13px;margin:0 0 14px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .sec-h{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:2px 0 12px}
+
+  label{display:block;font-size:11px;color:var(--muted);margin:10px 0 4px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+  input,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;color:var(--ink);background:#fff}
+  input:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px var(--lilac-bg)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  button{background:var(--violet);color:#fff;border:0;border-radius:10px;padding:10px 16px;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:14px;margin-right:8px}
+  button:hover{background:var(--violet-d)} button:disabled{background:var(--lilac);cursor:not-allowed}
+  button.ghost{background:#fff;color:var(--violet);border:1px solid var(--violet)} button.ghost:hover{background:var(--lilac-bg)}
+  button.sm{padding:7px 12px;font-size:12.5px;margin-top:10px}
+  .result{margin-top:14px;background:#faf9ff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;font-size:13.5px;display:none}
+  .result.show{display:block}
+  .kv{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--line)}.kv:last-child{border-bottom:0}
+  .total{font-size:18px;color:var(--violet);font-weight:800}
+  .pill{display:inline-block;background:var(--violet);color:#fff;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700}
+  .pill.ok{background:var(--okbg);color:var(--ok)}
+  .mono{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;word-break:break-all;background:var(--lilac-bg);border:1px solid var(--lilac);border-radius:8px;padding:9px 11px;color:var(--violet-d)}
+  .note{font-size:12px;color:var(--muted);margin-top:10px} .err{color:var(--err)}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)}
+  td{padding:9px 10px;border-bottom:1px solid var(--line)}tr:last-child td{border-bottom:0}
+  .badge{font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;background:var(--lilac-bg);color:var(--violet-d)}
+  .pos{color:var(--ok);font-weight:700}.neg{color:var(--err);font-weight:700}
+  .empty{color:var(--muted);font-size:13px;padding:16px 4px;text-align:center}
+  .m{font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:700;border-radius:5px;padding:2px 7px}.m.post{background:var(--lilac-bg);color:var(--violet-d)}.m.get{background:#eef6ee;color:var(--ok)}
+
+  /* map */
+  .mapwrap{background:#f3f2f8;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .driver-card{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;margin-top:14px}
+  .avatar{width:42px;height:42px;border-radius:50%;background:var(--lilac-bg);color:var(--violet-d);display:flex;align-items:center;justify-content:center;font-weight:800}
+  .tl{list-style:none;padding:0;margin:10px 0 0}
+  .tl li{position:relative;padding:4px 0 10px 20px;font-size:13px;color:var(--ink-2)}
+  .tl li:before{content:"";position:absolute;left:3px;top:8px;width:9px;height:9px;border-radius:50%;background:var(--violet)}
+  .tl li:after{content:"";position:absolute;left:7px;top:16px;bottom:-2px;width:1px;background:var(--line)}
+  .tl li:last-child:after{display:none}
+
+  /* code */
+  .tabs{display:flex;gap:6px;margin-bottom:8px}
+  .tabs button{background:#f3f3f5;color:var(--ink-2);margin:0;padding:6px 12px;font-size:12px;border-radius:8px}
+  .tabs button.on{background:var(--violet);color:#fff}
+  pre{background:var(--code);color:#e8e6f5;border-radius:12px;padding:14px 16px;overflow:auto;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.55;margin:0}
+  pre .k{color:#c3a6ff}.s{color:#9ae6b4}.c{color:#6b6b80}
+  #toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;font-size:13.5px;font-weight:600;opacity:0;transform:translateY(12px);transition:all .25s;z-index:100;box-shadow:0 10px 30px rgba(0,0,0,.2);pointer-events:none}
+  #toast.show{opacity:1;transform:translateY(0)}
+  .modal-bg{position:fixed;inset:0;background:rgba(10,10,12,.45);display:none;align-items:center;justify-content:center;z-index:200}
+  .modal-bg.show{display:flex}
+  .modal{background:var(--card);border-radius:14px;padding:22px 24px;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .modal h4{margin:0 0 6px;font-size:16px}
+  .modal .note{margin:0 0 14px}
+  .reason-opt{display:block;width:100%;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);font-size:13.5px;font-weight:600;margin-bottom:6px;cursor:pointer}
+  .reason-opt:hover{background:var(--lilac-bg);border-color:var(--lilac);color:var(--violet-d)}
+  .modal input{margin-top:4px}
+  .modal-row{display:flex;gap:8px;margin-top:12px}
+  .modal-row button{flex:1}
+
+  /* status chips & summary cards for Deliveries + Live tracking */
+  .chip.sm{font-size:11px;padding:3px 10px}
+  .chip.ok-g{background:#eaf7ee;color:var(--ok);border-color:#cfe9d4}
+  .chip.prog{background:#eef0ff;color:#3730a3;border-color:#c7d2fe}
+  .chip.warn{background:#fff6e5;color:#92400e;border-color:#fde68a}
+  .chip.gone{background:#f3f3f5;color:var(--muted);border-color:var(--line)}
+  .stats-row{display:flex;gap:8px;margin:0 0 12px;flex-wrap:wrap}
+  .stat-pill{background:var(--lilac-bg);color:var(--violet-d);padding:6px 12px;border-radius:20px;font-weight:600;font-size:12.5px}
+  .filter-row{display:flex;gap:6px;margin:0 0 14px;flex-wrap:wrap}
+  .filter-btn{background:#fff;border:1px solid var(--line);border-radius:20px;padding:5px 14px;font-size:12.5px;font-weight:600;color:var(--ink-2);cursor:pointer}
+  .filter-btn.active{background:var(--lilac-bg);border-color:var(--lilac);color:var(--violet-d)}
+  .filter-btn:hover:not(.active){background:#f5f4f9}
+  tr.clickable{cursor:pointer}
+  tr.clickable:hover{background:#f8f7fc}
+  .summary-card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:#fafafb;margin-top:12px}
+  .summary-card.ok{background:#eaf7ee;border-color:#cfe9d4}
+  .summary-card.gone{background:#f3f3f5}
+  .summary-card h4{margin:0 0 8px;font-size:14.5px}
+  .summary-card .kv{display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:var(--ink-2)}
+  .summary-card .kv b{color:var(--ink)}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:5px}
+  button.copy{background:none;border:1px solid var(--line);color:var(--muted);padding:5px 10px;font-size:11.5px;margin:0}
+  button.copy:hover{background:#f5f4f9;color:var(--violet)}
+  @media(max-width:860px){.sidebar{display:none}.cards{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo">aerrand</div>
+    <nav class="nav">
+      <a data-p="overview" class="active" onclick="nav('overview')">◎ Overview</a>
+      <a data-p="create" onclick="nav('create')">＋ Create delivery</a>
+      <a data-p="deliveries" onclick="nav('deliveries')">▤ Deliveries</a>
+      <a data-p="tracking" onclick="nav('tracking')">◉ Live tracking</a>
+      <a data-p="wallet" onclick="nav('wallet')">▦ Wallet</a>
+      <a data-p="webhooks" onclick="nav('webhooks')">⇄ Webhooks</a>
+    </nav>
+    <div class="side-foot"><b>Business 3 · Group 6</b></div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <h1 id="pageTitle">Overview</h1>
+      <div class="top-right">
+        <span class="chip" id="walletChip">Wallet —</span>
+        <span class="chip off" id="keyChip">Not connected</span>
+        <span class="chip env">● Sandbox</span>
+      </div>
+    </div>
+
+    <div class="wrap">
+
+      <!-- OVERVIEW -->
+      <section class="page active" id="p-overview">
+        <div class="cards">
+          <div class="metric"><div class="l">Deliveries</div><div class="v" id="mDeliv">0</div></div>
+          <div class="metric"><div class="l">Booked (CAD)</div><div class="v" id="mBooked">$0</div></div>
+          <div class="metric"><div class="l">Wallet balance</div><div class="v" id="mWallet">—</div></div>
+          <div class="metric"><div class="l">Webhook events</div><div class="v" id="mEvents">0</div></div>
+        </div>
+        <div class="two">
+          <div class="card"><h3>Recent deliveries</h3><table><thead><tr><th>Code</th><th>Status</th><th style="text-align:right">Price</th></tr></thead><tbody id="ovDeliv"><tr><td colspan="3" class="empty">Nothing yet — create a delivery to begin.</td></tr></tbody></table></div>
+          <div class="card"><h3>Recent events</h3><table><thead><tr><th>Event</th><th>Status</th></tr></thead><tbody id="ovEvents"><tr><td colspan="2" class="empty">No events yet.</td></tr></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- CREATE -->
+      <section class="page" id="p-create">
+        <div class="card"><h3>1 · API key &amp; wallet</h3><p class="d">A business gets a key (stored only as a hash) and a prepaid wallet. Rotate or revoke instantly — every action is audit-logged.</p>
+          <label>Business name</label><input id="business" value="Acme Co">
+          <button id="btnKey" onclick="genKey()">Generate test key</button>
+          <div class="result" id="keyOut"></div></div>
+        <div class="card"><h3>2 · Price a route</h3><p class="d">The server computes the price from distance, stops, parcel sizes and tax. The caller can never send a price.</p>
+          <label>Pickup location</label>
+          <input id="puSel" list="places" value="Downtown Windsor" placeholder="Type an address or place in Windsor">
+          <label>Drop-off location</label>
+          <input id="doSel" list="places" value="Devonshire Mall" placeholder="Type an address or place in Windsor">
+          <datalist id="places">
+            <option>Downtown Windsor</option>
+            <option>University of Windsor</option>
+            <option>Devonshire Mall</option>
+            <option>Windsor Airport (YQG)</option>
+            <option>St. Clair College</option>
+            <option>Riverside</option>
+            <option>Tecumseh</option>
+            <option>LaSalle</option>
+          </datalist>
+          <span class="note">Pick a suggestion or type any Windsor address — we look up the coordinates.</span>
+          <label>Parcels — small, medium, large</label><div class="row3"><input id="pSmall" value="2"><input id="pMedium" value="1"><input id="pLarge" value="0"></div>
+          <button id="btnQuote" onclick="getQuote()" disabled>Get quote</button><div class="result" id="quoteOut"></div></div>
+        <div class="card"><h3>3 · Create the delivery</h3><p class="d">Booking charges the wallet and emits events. Then track it live.</p>
+          <label>Recipient name</label><input id="rName" value="Jordan Alvarez">
+          <label>Recipient phone</label><input id="rPhone" value="+15195550188">
+          <label>Scheduled time (optional — blank = ASAP)</label><input id="schedAt" type="datetime-local">
+          <button id="btnCreate" onclick="createErrand()" disabled>Create delivery</button><div class="result" id="errandOut"></div></div>
+      </section>
+
+      <!-- DELIVERIES -->
+      <section class="page" id="p-deliveries">
+        <div class="card"><h3>All deliveries</h3><p class="d">Scoped to your business — one business can never see another's (tenant isolation).</p>
+          <div class="stats-row" id="delivStats"></div>
+          <div class="filter-row">
+            <button class="filter-btn active" data-f="all" onclick="filterDeliv('all')">All</button>
+            <button class="filter-btn" data-f="progress" onclick="filterDeliv('progress')">In progress</button>
+            <button class="filter-btn" data-f="delivered" onclick="filterDeliv('delivered')">Delivered</button>
+            <button class="filter-btn" data-f="cancelled" onclick="filterDeliv('cancelled')">Cancelled</button>
+          </div>
+          <table><thead><tr><th>Code</th><th>Reference</th><th>Status</th><th>Vehicle</th><th>Created</th><th style="text-align:right">Price</th><th></th></tr></thead>
+          <tbody id="delivRows"><tr><td colspan="7" class="empty">No deliveries yet.</td></tr></tbody></table></div>
+      </section>
+
+      <!-- TRACKING -->
+      <section class="page" id="p-tracking">
+        <div class="card" id="trackEmpty"><h3>Live tracking</h3><p class="d">Create a delivery, then advance it here to watch the driver move toward the drop-off.</p></div>
+        <div class="two" id="trackView" style="display:none">
+          <div class="card"><h3>Driver on the map</h3>
+            <div class="mapwrap" id="mapBox"></div>
+            <div class="driver-card" id="driverCard"></div>
+            <div id="trackActions">
+              <button class="sm" id="btnAdvance" onclick="advance()">Advance (simulate driver)</button>
+              <button class="ghost sm" id="btnCancel" onclick="cancelErrand()">Cancel delivery</button>
+            </div>
+            <div id="trackSummary"></div>
+            <div class="note" id="trackMsg"></div>
+          </div>
+          <div class="card"><h3>Status timeline</h3><div id="trackMeta"></div><ul class="tl" id="timeline"></ul></div>
+        </div>
+      </section>
+
+      <!-- WALLET -->
+      <section class="page" id="p-wallet">
+        <div class="cards" style="grid-template-columns:repeat(3,1fr)">
+          <div class="metric"><div class="l">Balance</div><div class="v" id="wBig" style="color:var(--violet);font-size:30px">—</div></div>
+          <div class="metric"><div class="l">Total added</div><div class="v pos" id="wAdded">—</div></div>
+          <div class="metric"><div class="l">Total spent</div><div class="v neg" id="wSpent">—</div></div>
+        </div>
+        <div class="card"><h3>Top up the wallet</h3>
+          <p class="d">Bookings charge this balance; cancellations refund to it.</p>
+          <div class="row3" style="max-width:380px">
+            <button class="ghost sm" onclick="topup(25)">+ $25</button>
+            <button class="ghost sm" onclick="topup(50)">+ $50</button>
+            <button class="ghost sm" onclick="topup(100)">+ $100</button>
+          </div></div>
+        <div class="card"><h3>Transaction statement</h3>
+          <table><thead><tr><th>Type</th><th>Note</th><th>When</th><th style="text-align:right">Amount</th></tr></thead>
+          <tbody id="txnRows"><tr><td colspan="4" class="empty">No transactions yet.</td></tr></tbody></table></div>
+      </section>
+
+      <!-- WEBHOOKS -->
+      <section class="page" id="p-webhooks">
+        <div class="card"><h3>Register an endpoint</h3><p class="d">We push a signed event to your URL whenever a delivery changes state.</p>
+          <label>Your https URL</label><input id="whUrl" value="https://example.com/aerrand/webhook">
+          <button class="sm" onclick="registerWebhook()">Add endpoint</button><div class="result" id="whOut"></div></div>
+        <div class="two">
+          <div class="card"><h3>Event feed (signed)</h3><p class="d">Live events as deliveries progress.</p>
+            <table><thead><tr><th>Event</th><th>Status</th><th>Signature</th></tr></thead><tbody id="evRows"><tr><td colspan="3" class="empty">No events yet.</td></tr></tbody></table></div>
+          <div class="card"><h3>Event catalogue</h3>
+            <div id="catalog" class="note"></div>
+            <h3 style="margin-top:16px">Sample signed payload</h3>
+            <pre><span class="c">Aerrand-Signature: t=1756476611,v1=5f1a…c9</span>
+{
+  <span class="k">"id"</span>: <span class="s">"evt_01J8…"</span>,
+  <span class="k">"type"</span>: <span class="s">"errand.delivered"</span>,
+  <span class="k">"created"</span>: 1756476611,
+  <span class="k">"data"</span>: { <span class="k">"errand_id"</span>: <span class="s">"8f1c…"</span>, <span class="k">"status"</span>: <span class="s">"delivered"</span> }
+}</pre></div>
+        </div>
+      </section>
+
+      <!-- DOCS -->
+    </div>
+  </div>
+</div>
+
+<script>
+let API_KEY=null, QUOTE_ID=null, KEY_PREFIX=null, ERRAND_ID=null, BUSINESS="", PICKUP=null, DROP=null;
+const $=id=>document.getElementById(id);
+const money=n=>"$"+Number(n).toFixed(2);
+const show=(el,h)=>{el.innerHTML=h;el.classList.add("show");};
+const fail=(el,m)=>show(el,'<span class="err">'+m+'</span>');
+const kv=(k,v)=>'<div class="kv"><span>'+k+'</span><b>'+v+'</b></div>';
+const TITLES={overview:"Overview",create:"Create delivery",deliveries:"Deliveries",tracking:"Live tracking",wallet:"Wallet",webhooks:"Webhooks"};
+let _tt; function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show");clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove("show"),2600);}
+function copy(txt){(navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast("Copied to clipboard")).catch(()=>toast("Copy not available"));}
+
+function nav(p){
+  document.querySelectorAll(".page").forEach(s=>s.classList.remove("active"));
+  $("p-"+p).classList.add("active");
+  document.querySelectorAll(".nav a").forEach(a=>a.classList.toggle("active",a.dataset.p===p));
+  $("pageTitle").textContent=TITLES[p];
+  if(p==="overview"){loadErrands();loadEvents();}
+  if(p==="deliveries")loadErrands();
+  if(p==="wallet")loadWallet();
+  if(p==="webhooks")loadEvents();
+  if(p==="tracking"){ refreshTrack(); startTrackPolling(); } else { stopGraceCountdown(); stopTrackPolling(); }
+}
+
+async function api(path,method,body,extra){
+  const h={"Content-Type":"application/json"};
+  if(API_KEY) h["Authorization"]="Bearer "+API_KEY;
+  if(extra) Object.assign(h,extra);
+  const r=await fetch(path,{method,headers:h,body:body?JSON.stringify(body):undefined});
+  const d=await r.json().catch(()=>({})); return {ok:r.ok,status:r.status,data:d};
+}
+
+/* keys (Nikhil) */
+async function genKey(){
+  $("btnKey").disabled=true;
+  const r=await api("/v1/keys","POST",{business:$("business").value});
+  $("btnKey").disabled=false;
+  if(!r.ok) return fail($("keyOut"),"Error "+r.status);
+  API_KEY=r.data.key; KEY_PREFIX=r.data.prefix; BUSINESS=r.data.business;
+  $("keyChip").textContent="● "+BUSINESS; $("keyChip").className="chip env";
+  show($("keyOut"),'<div class="pill">test key · '+BUSINESS+'</div>'+
+    '<div style="display:flex;gap:8px;align-items:center;margin-top:9px"><div class="mono" style="flex:1">'+r.data.key+'</div><button class="copy" onclick="copy(\''+r.data.key+'\')">Copy</button></div>'+
+    '<div class="note">Scopes: '+r.data.scopes.join(", ")+'. Stored only as a hash.</div>'+
+    '<button class="ghost sm" onclick="rotateKey()">Rotate</button><button class="ghost sm" onclick="revokeKey()">Revoke</button><div id="keyMsg" class="note"></div>');
+  $("btnQuote").disabled=false; loadWallet(); toast("API key created");
+}
+async function rotateKey(){
+  const r=await api("/v1/keys/rotate","POST",{prefix:KEY_PREFIX}); if(!r.ok)return;
+  const old=API_KEY; API_KEY=r.data.key; KEY_PREFIX=r.data.prefix;
+  const chk=await fetch("/v1/wallet",{headers:{"Authorization":"Bearer "+old}});
+  $("keyMsg").innerHTML='<b style="color:var(--violet)">Rotated.</b> Old key now returns HTTP '+chk.status+' — logged in the audit trail.';
+  $("keyOut").querySelector(".mono").textContent=API_KEY;
+}
+async function revokeKey(){
+  await api("/v1/keys/revoke","POST",{prefix:KEY_PREFIX});
+  const t=await api("/v1/quotes","POST",{pickup:{lat:"42.3149",lng:"-83.0364"},stops:[{lat:"42.28",lng:"-82.99",parcels:{small:1}}]});
+  $("keyChip").textContent="● revoked"; $("keyChip").className="chip off";
+  $("keyMsg").innerHTML='<b style="color:var(--violet)">Revoked.</b> The key now returns HTTP '+t.status+' — instant.';
+}
+
+/* wallet (Charan) */
+async function loadWallet(){
+  if(!API_KEY){
+    $("wBig").textContent="—"; $("wAdded").textContent="—"; $("wSpent").textContent="—";
+    $("txnRows").innerHTML='<tr><td colspan="4" class="empty">Generate a key on the “Create delivery” page first — the wallet belongs to that business.</td></tr>';
+    return;
+  }
+  const r=await api("/v1/wallet","GET"); if(!r.ok)return;
+  $("walletChip").textContent="Wallet "+money(r.data.balance);
+  $("mWallet").textContent=money(r.data.balance); $("wBig").textContent=money(r.data.balance);
+  const tx=r.data.transactions||[];
+  let added=0, spent=0;
+  tx.forEach(t=>{ if(t.kind==="topup") added+=t.amount; else if(t.kind==="charge") spent+=-t.amount; });
+  $("wAdded").textContent="+"+money(added);
+  $("wSpent").textContent="-"+money(spent);
+  const label={topup:"Top-up",charge:"Charge",refund:"Refund"};
+  $("txnRows").innerHTML = tx.length? tx.map(t=>'<tr><td><span class="badge">'+(label[t.kind]||t.kind)+'</span></td><td>'+t.note+'</td><td>'+t.at.slice(5,16).replace("T"," ")+'</td><td style="text-align:right" class="'+(t.amount<0?'neg':'pos')+'">'+(t.amount<0?'':'+')+money(t.amount)+'</td></tr>').join("")
+    : '<tr><td colspan="4" class="empty">No transactions yet.</td></tr>';
+}
+async function topup(amount){
+  if(!API_KEY){ toast("Generate a key first — on the “Create delivery” page"); return; }
+  amount=amount||50;
+  const r=await api("/v1/wallet/topup","POST",{amount});
+  if(!r.ok){ toast("Top-up failed ("+((r.data.error&&r.data.error.message)||r.status)+")"); return; }
+  loadWallet(); toast("Topped up "+money(amount));
+}
+
+/* pricing (Sujith) */
+async function geocodeAddr(q){ const r=await api("/v1/geocode","POST",{query:q}); return r.ok?r.data:null; }
+async function getQuote(){
+  show($("quoteOut"),'<span class="note">Looking up the addresses…</span>');
+  const pu=await geocodeAddr($("puSel").value);
+  if(!pu) return fail($("quoteOut"),"Couldn't find the pickup location near Windsor.");
+  const ds=await geocodeAddr($("doSel").value);
+  if(!ds) return fail($("quoteOut"),"Couldn't find the drop-off location near Windsor.");
+  PICKUP=pu; DROP=ds;
+  const stop={lat:ds.lat,lng:ds.lng,parcels:{small:+$("pSmall").value||0,medium:+$("pMedium").value||0,large:+$("pLarge").value||0}};
+  const r=await api("/v1/quotes","POST",{pickup:{lat:pu.lat,lng:pu.lng},stops:[stop]});
+  if(!r.ok) return fail($("quoteOut"),(r.data.error&&r.data.error.message)||("Error "+r.status));
+  QUOTE_ID=r.data.quote_id; const d=r.data;
+  show($("quoteOut"),kv("Base (stops)",money(d.dropBaseTotal))+kv("Distance ("+d.routeKm+" km)",money(d.distanceCharge))+kv("Parcel add-ons",money(d.sizeAddOnTotal))+kv("Pre-tax",money(d.routePrice))+kv("HST (13%)",money(d.hst))+'<div class="kv"><span>Total (tax in)</span><b class="total">'+money(d.chargeTotal)+'</b></div><div class="note">Recommended vehicle: '+d.recommendedVehicle+'</div>');
+  $("btnCreate").disabled=false;
+}
+
+/* create + tracking (Sai) */
+async function createErrand(){
+  if(!PICKUP||!DROP) return fail($("errandOut"),"Get a quote first.");
+  const body={quote_id:QUOTE_ID,pickup:{lat:PICKUP.lat,lng:PICKUP.lng},dropoff:{lat:DROP.lat,lng:DROP.lng,contact:{name:$("rName").value,phone_number:$("rPhone").value},preference:"leave_at_door"}};
+  if($("schedAt").value) body.scheduled_at=new Date($("schedAt").value).toISOString();
+  const r=await api("/v1/errands","POST",body);
+  if(!r.ok) return fail($("errandOut"),(r.data.error&&r.data.error.message)||("Error "+r.status));
+  const e=r.data; ERRAND_ID=e.errand_id; $("trackMsg").innerHTML="";
+  show($("errandOut"),'<div class="pill">'+(e.test_mode?"TEST · ":"")+e.status+'</div>'+kv("Errand ID",'<span class="mono">'+e.errand_id+'</span>')+kv("Handover code","<b>"+e.delivery_code+"</b>")+kv("Charged to wallet",money(e.pricing.charge_total))+'<div class="note">Opening live tracking…</div>');
+  loadWallet(); toast("Delivery created · wallet charged "+money(e.pricing.charge_total)); setTimeout(()=>{nav("tracking");},700);
+}
+
+// Quiet background poll of the tracking endpoint while the Live tracking page is open.
+let _pollTimer=null;
+function startTrackPolling(){ stopTrackPolling(); _pollTimer=setInterval(()=>{ if(ERRAND_ID) refreshTrack(); }, 3000); }
+function stopTrackPolling(){ if(_pollTimer){ clearInterval(_pollTimer); _pollTimer=null; } }
+function ago(iso){
+  const s=Math.max(0,Math.round((Date.now()-new Date(iso).getTime())/1000));
+  if(s<10) return "just now";
+  if(s<60) return s+"s ago";
+  const m=Math.round(s/60);
+  if(m<60) return m+" min ago";
+  const h=Math.round(m/60);
+  return h+"h ago";
+}
+async function refreshTrack(){
+  if(!ERRAND_ID){ $("trackEmpty").style.display="block"; $("trackView").style.display="none"; return; }
+  const r=await api("/v1/errands/"+ERRAND_ID+"/tracking","GET");
+  if(!r.ok){ $("trackEmpty").style.display="block"; $("trackView").style.display="none"; return; }
+  $("trackEmpty").style.display="none"; $("trackView").style.display="grid";
+  renderTrack(r.data);
+}
+function project(p,box){const W=520,H=300,pad=34;
+  const x=pad+(p.lng-box.minLng)/((box.maxLng-box.minLng)||1)*(W-2*pad);
+  const y=pad+(box.maxLat-p.lat)/((box.maxLat-box.minLat)||1)*(H-2*pad);return [x.toFixed(1),y.toFixed(1)];}
+function renderTrack(t){
+  const pts=[t.pickup,t.dropoff]; if(t.driver)pts.push({lat:t.driver.lat,lng:t.driver.lng});
+  const lats=pts.map(p=>p.lat),lngs=pts.map(p=>p.lng);
+  const dlat=(Math.max(...lats)-Math.min(...lats))||0.01, dlng=(Math.max(...lngs)-Math.min(...lngs))||0.01;
+  const box={minLat:Math.min(...lats)-dlat*.35,maxLat:Math.max(...lats)+dlat*.35,minLng:Math.min(...lngs)-dlng*.35,maxLng:Math.max(...lngs)+dlng*.35};
+  const [px,py]=project(t.pickup,box),[dx,dy]=project(t.dropoff,box);
+  let grid=''; for(let i=1;i<8;i++){grid+='<line x1="'+(i*65)+'" y1="0" x2="'+(i*65)+'" y2="300" stroke="#e4e2ee"/>';}
+  for(let i=1;i<5;i++){grid+='<line x1="0" y1="'+(i*60)+'" x2="520" y2="'+(i*60)+'" stroke="#e4e2ee"/>';}
+  let driver=''; if(t.driver){const [vx,vy]=project({lat:t.driver.lat,lng:t.driver.lng},box);
+    // Smoothly animate the driver dot from its previous position (if any) to the new one.
+    const fx = (_lastDriver && _lastDriver.id===t.errand_id) ? _lastDriver.x : vx;
+    const fy = (_lastDriver && _lastDriver.id===t.errand_id) ? _lastDriver.y : vy;
+    const anim = (fx!==vx || fy!==vy)
+      ? '<animate attributeName="cx" from="'+fx+'" to="'+vx+'" dur="0.8s" fill="freeze"/>'
+       +'<animate attributeName="cy" from="'+fy+'" to="'+vy+'" dur="0.8s" fill="freeze"/>'
+      : '';
+    driver='<circle cx="'+vx+'" cy="'+vy+'" r="12" fill="#5202d9" opacity=".25"><animate attributeName="r" values="12;20;12" dur="1.6s" repeatCount="indefinite"/>'+anim+'</circle>'
+          +'<circle cx="'+vx+'" cy="'+vy+'" r="7" fill="#5202d9" stroke="#fff" stroke-width="2">'+anim+'</circle>';
+    _lastDriver={id:t.errand_id, x:vx, y:vy};
+  } else { _lastDriver=null; }
+  $("mapBox").innerHTML='<svg viewBox="0 0 520 300" width="100%">'+grid+
+    '<line x1="'+px+'" y1="'+py+'" x2="'+dx+'" y2="'+dy+'" stroke="#5202d9" stroke-width="2.5" stroke-dasharray="6 5"/>'+
+    '<circle cx="'+px+'" cy="'+py+'" r="7" fill="#fff" stroke="#6b6b6b" stroke-width="3"/><text x="'+px+'" y="'+(py-12)+'" font-size="11" fill="#6b6b6b" text-anchor="middle" font-weight="700">PICKUP</text>'+
+    '<circle cx="'+dx+'" cy="'+dy+'" r="7" fill="#5202d9"/><text x="'+dx+'" y="'+(dy-12)+'" font-size="11" fill="#5202d9" text-anchor="middle" font-weight="700">DROP-OFF</text>'+driver+'</svg>';
+  if(t.driver){const d=t.driver;const clock=t.eta_at?new Date(t.eta_at).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}):'';const dist=t.distance_remaining_km?' · '+t.distance_remaining_km+' km':'';$("driverCard").innerHTML='<div class="avatar">'+d.name[0]+'</div><div style="flex:1"><b>'+d.name+'</b> · ★ '+d.rating+'<br><span class="note" style="margin:0">'+d.vehicle+' · '+d.plate+' · '+(d.phone||'')+'</span></div>'+(t.eta_minutes?'<div style="text-align:right"><b style="font-size:18px;color:var(--violet)">'+t.eta_minutes+' min</b><br><span class="note" style="margin:0">ETA'+(clock?' · '+clock:'')+dist+'</span></div>':'');}
+  else $("driverCard").innerHTML='<div class="note" style="margin:0">No driver assigned yet — advance to dispatch.</div>';
+  $("trackMeta").innerHTML=kv("Status","<b>"+t.status+"</b>")+kv("Handover code",t.delivery_code);
+  $("timeline").innerHTML=(t.timeline||[]).map(s=>'<li><b>'+s.status+'</b> · '+s.at.slice(11,19)+' <span class="note" style="margin:0">· '+ago(s.at)+'</span></li>').join("");
+  // Terminal state: hide Advance/Cancel and show a persistent summary card instead.
+  const terminal=(t.status==="delivered"||t.status==="cancelled");
+  $("trackActions").style.display = terminal ? "none" : "";
+  $("trackSummary").innerHTML = terminal ? renderSummary(t) : "";
+  $("btnAdvance").disabled=terminal;
+  $("btnCancel").disabled=terminal;
+  // Label the Cancel button with the fee it would charge right now (0 before a driver accepts).
+  const c=t.cancellation||{};
+  const feeNow=(c.fee_cents||0)/100;
+  const grace=c.grace_seconds_remaining||0;
+  if(c.allowed && grace>0){ startGraceCountdown(grace); }
+  else {
+    stopGraceCountdown();
+    $("btnCancel").textContent = c.allowed
+      ? (feeNow>0 ? "Cancel delivery · $"+feeNow.toFixed(2)+" fee"
+         : "Cancel delivery (no fee)")
+      : "Cancel delivery";
+  }
+}
+
+// Last-rendered driver pixel position, so a redraw can animate to the new spot.
+let _lastDriver=null;
+function renderSummary(t){
+  if(t.status==="delivered"){
+    const tl=t.timeline||[];
+    const first=tl[0]&&tl[0].at, last=tl[tl.length-1]&&tl[tl.length-1].at;
+    const mins = (first && last) ? Math.max(1, Math.round((new Date(last)-new Date(first))/60000)) : null;
+    return '<div class="summary-card ok"><h4>✓ Delivered</h4>'
+      + '<div class="kv"><span>Handover code</span><b>'+t.delivery_code+'</b></div>'
+      + (mins?'<div class="kv"><span>End-to-end</span><b>'+mins+' min</b></div>':'')
+      + '<div class="kv"><span>Driver</span><b>'+(t.driver?t.driver.name:'—')+'</b></div>'
+      + '</div>';
+  }
+  const c=t.cancellation_result||{};
+  return '<div class="summary-card gone"><h4>✕ Cancelled</h4>'
+    + (c.from_stage?'<div class="kv"><span>Cancelled from</span><b>'+c.from_stage+'</b></div>':'')
+    + (c.reason?'<div class="kv"><span>Reason</span><b>'+c.reason+'</b></div>':'')
+    + ('fee' in c?'<div class="kv"><span>Fee</span><b>'+money(c.fee)+'</b></div>':'')
+    + ('refund' in c?'<div class="kv"><span>Refunded to wallet</span><b>'+money(c.refund)+'</b></div>':'')
+    + '</div>';
+}
+
+// Live countdown that ticks the grace window down one second at a time, with a
+// progress bar across the Cancel button. When it hits zero we refetch tracking
+// so the server-side fee preview kicks in.
+let _graceTimer=null;
+function stopGraceCountdown(){
+  if(_graceTimer){ clearInterval(_graceTimer); _graceTimer=null; }
+  const b=$("btnCancel"); if(b){ b.style.backgroundImage=""; b.style.transition=""; }
+}
+function startGraceCountdown(seconds){
+  stopGraceCountdown();
+  const total=30; let left=seconds;
+  const paint=()=>{
+    const b=$("btnCancel"); if(!b) return;
+    b.textContent="Cancel delivery · free for "+left+"s more";
+    const pct=Math.max(0,Math.min(100,(left/total)*100));
+    b.style.backgroundImage="linear-gradient(to right, var(--lilac-bg) "+pct+"%, transparent "+pct+"%)";
+    b.style.transition="background-image 0.8s linear";
+  };
+  paint();
+  _graceTimer=setInterval(()=>{
+    left-=1;
+    if(left<=0){
+      stopGraceCountdown();
+      toast("Free-cancel window ended — a fee now applies.");
+      refreshTrack();
+      return;
+    }
+    paint();
+  },1000);
+}
+async function advance(){
+  const r=await api("/v1/errands/"+ERRAND_ID+"/advance","POST",{});
+  if(!r.ok){$("trackMsg").innerHTML=(r.data.error&&r.data.error.message)||"At final stage.";}
+  else{ toast(r.data.status==="delivered"?"Delivered ✓":"Status → "+r.data.status); }
+  refreshTrack(); loadEvents();
+}
+// Promise-based reason picker — resolves to a string or null (cancelled).
+function pickReason(summary){
+  return new Promise(resolve=>{
+    const m=$("reasonModal"), other=$("reasonOther");
+    $("reasonModal").querySelector(".note").textContent=summary;
+    other.value="";
+    const close=val=>{ m.classList.remove("show"); cleanup(); resolve(val); };
+    function cleanup(){
+      m.querySelectorAll(".reason-opt").forEach(b=>b.onclick=null);
+      $("reasonCancel").onclick=null; $("reasonSubmit").onclick=null;
+    }
+    m.querySelectorAll(".reason-opt").forEach(b=>{ b.onclick=()=>close(b.dataset.r); });
+    $("reasonCancel").onclick=()=>close(undefined);  // undefined = user backed out
+    $("reasonSubmit").onclick=()=>close(other.value.trim()||null);
+    m.classList.add("show"); other.focus();
+  });
+}
+async function cancelErrand(){
+  // Pull the latest preview so the dialog shows the real fee / refund.
+  const t=await api("/v1/errands/"+ERRAND_ID+"/tracking","GET");
+  let reason=null;
+  if(t.ok && t.data.cancellation && t.data.cancellation.allowed){
+    const fee=(t.data.cancellation.fee_cents||0)/100, ref=(t.data.cancellation.refund_cents||0)/100;
+    const grace=t.data.cancellation.grace_seconds_remaining||0;
+    const summary = grace>0
+      ? "Still free for "+grace+"s · $"+ref.toFixed(2)+" refund to the wallet."
+      : fee>0
+        ? "A $"+fee.toFixed(2)+" fee applies — you'll be refunded $"+ref.toFixed(2)+" to the wallet."
+        : "You'll be refunded $"+ref.toFixed(2)+" to the wallet (no fee).";
+    const picked=await pickReason(summary);
+    if(picked===undefined) return;        // user clicked Back
+    reason=picked;                        // may be null (no reason), a preset slug, or custom text
+  }
+  const headers={};
+  // Browser-generated idempotency key: a flaky retry of this exact cancel won't double-fire the webhook.
+  headers["Idempotency-Key"]="cancel-"+ERRAND_ID+"-"+Date.now();
+  const r=await api("/v1/errands/"+ERRAND_ID+"/cancel","POST", reason?{reason}:{}, headers);
+  if(r.status===409){$("trackMsg").innerHTML='<b style="color:var(--err)">'+((r.data.error&&r.data.error.message)||"Can't cancel this delivery.")+'</b>';refreshTrack();return;}
+  if(r.ok){$("trackMsg").innerHTML='<b style="color:var(--violet)">Cancelled.</b> Fee '+money(r.data.fee)+', refunded '+money(r.data.refund)+' to the wallet.'; refreshTrack(); loadWallet(); loadEvents(); toast("Cancelled · refunded "+money(r.data.refund));}
+}
+
+/* deliveries + overview */
+let _allDeliv=[], _delivFilter="all";
+function statusChip(s){
+  const cls = s==="delivered"?"ok-g"
+    : s==="cancelled"?"gone"
+    : (s==="pending"||s==="pending_payment"||s==="broadcasted")?"warn"
+    : "prog";
+  return '<span class="chip '+cls+' sm">'+s+'</span>';
+}
+function filterDeliv(f){
+  _delivFilter=f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active', b.dataset.f===f));
+  renderDeliveries();
+}
+function renderDeliveries(){
+  const list=_allDeliv;
+  const stats={progress:0, delivered:0, cancelled:0};
+  for(const e of list){
+    if(e.status==="delivered") stats.delivered++;
+    else if(e.status==="cancelled") stats.cancelled++;
+    else stats.progress++;
+  }
+  $("delivStats").innerHTML =
+    '<span class="stat-pill">'+stats.progress+' in progress</span>' +
+    '<span class="stat-pill">'+stats.delivered+' delivered</span>' +
+    '<span class="stat-pill">'+stats.cancelled+' cancelled</span>';
+  const filtered = list.filter(e=>{
+    if(_delivFilter==="all") return true;
+    if(_delivFilter==="progress") return e.status!=="delivered" && e.status!=="cancelled";
+    return e.status===_delivFilter;
+  });
+  $("delivRows").innerHTML = filtered.length
+    ? filtered.map(e=>'<tr class="clickable" onclick="track(\''+e.errand_id+'\')">'
+        +'<td><b>'+e.delivery_code+'</b> '+(e.test_mode?'<span class="badge">TEST</span>':'')+'</td>'
+        +'<td>'+(e.reference||"—")+'</td>'
+        +'<td>'+statusChip(e.status)+'</td>'
+        +'<td>'+e.vehicle_type+'</td>'
+        +'<td>'+(e.created_at?ago(e.created_at):'—')+'</td>'
+        +'<td style="text-align:right">'+money(e.pricing.charge_total)+'</td>'
+        +'<td><button class="ghost sm" style="margin:0" onclick="event.stopPropagation();track(\''+e.errand_id+'\')">Track</button></td>'
+        +'</tr>').join("")
+    : '<tr><td colspan="7" class="empty">No deliveries match this filter.</td></tr>';
+}
+async function loadErrands(){
+  const r=await api("/v1/errands","GET"); if(!r.ok)return;
+  _allDeliv = r.data.errands||[];
+  $("mDeliv").textContent=_allDeliv.length;
+  $("mBooked").textContent=money(_allDeliv.reduce((s,e)=>s+Number(e.pricing.charge_total),0));
+  const ovRow=e=>'<tr><td><b>'+e.delivery_code+'</b> '+(e.test_mode?'<span class="badge">TEST</span>':'')+'</td><td>'+statusChip(e.status)+'</td><td style="text-align:right">'+money(e.pricing.charge_total)+'</td></tr>';
+  $("ovDeliv").innerHTML=_allDeliv.length?_allDeliv.slice(0,5).map(ovRow).join(""):'<tr><td colspan="3" class="empty">Nothing yet.</td></tr>';
+  renderDeliveries();
+}
+function track(id){ if(id!==ERRAND_ID){ $("trackMsg").innerHTML=""; stopGraceCountdown(); } ERRAND_ID=id; nav("tracking"); }
+
+/* webhooks (team) */
+async function loadEvents(){
+  const r=await api("/v1/events","GET"); if(!r.ok)return;
+  const ev=r.data.events||[];
+  $("mEvents").textContent=ev.length;
+  $("evRows").innerHTML=ev.length?ev.map(e=>'<tr><td><span class="badge">'+e.type+'</span></td><td>'+e.status+'</td><td class="mono" style="background:none;border:0;font-size:11px">'+e.signature.slice(0,22)+'…</td></tr>').join(""):'<tr><td colspan="3" class="empty">No events yet.</td></tr>';
+  $("ovEvents").innerHTML=ev.length?ev.slice(0,6).map(e=>'<tr><td><span class="badge">'+e.type+'</span></td><td>'+e.status+'</td></tr>').join(""):'<tr><td colspan="2" class="empty">No events yet.</td></tr>';
+  const cat=await api("/v1/webhooks","GET");
+  if(cat.ok) $("catalog").innerHTML=(cat.data.event_catalog||[]).map(c=>'<span class="badge" style="margin:2px">'+c+'</span>').join(" ");
+}
+async function registerWebhook(){
+  const r=await api("/v1/webhooks","POST",{url:$("whUrl").value});
+  if(!r.ok) return fail($("whOut"),(r.data.error&&r.data.error.message)||"Error");
+  show($("whOut"),'<b style="color:var(--violet)">Endpoint added.</b> id '+r.data.id+' — events: '+r.data.events.join(", "));
+  toast("Webhook endpoint added");
+}
+
+
+</script>
+<div id="toast"></div>
+
+<div class="modal-bg" id="reasonModal">
+  <div class="modal">
+    <h4>Why are you cancelling?</h4>
+    <p class="note">Pick a reason, or write your own. Helps us improve the service.</p>
+    <button class="reason-opt" data-r="customer_changed_mind">Customer changed their mind</button>
+    <button class="reason-opt" data-r="wrong_address">Wrong address or recipient info</button>
+    <button class="reason-opt" data-r="package_not_ready">Package isn't ready yet</button>
+    <button class="reason-opt" data-r="driver_too_slow">Driver taking too long</button>
+    <button class="reason-opt" data-r="no_longer_needed">No longer needed</button>
+    <label style="margin-top:8px;display:block">Something else (optional)</label>
+    <input id="reasonOther" type="text" maxlength="60" placeholder="Type your own reason…">
+    <div class="modal-row">
+      <button class="ghost sm" id="reasonCancel">Keep delivery</button>
+      <button class="sm" id="reasonSubmit">Cancel with this reason</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
