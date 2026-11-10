@@ -92,6 +92,37 @@
   pre .k{color:#c3a6ff}.s{color:#9ae6b4}.c{color:#6b6b80}
   #toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;font-size:13.5px;font-weight:600;opacity:0;transform:translateY(12px);transition:all .25s;z-index:100;box-shadow:0 10px 30px rgba(0,0,0,.2);pointer-events:none}
   #toast.show{opacity:1;transform:translateY(0)}
+  .modal-bg{position:fixed;inset:0;background:rgba(10,10,12,.45);display:none;align-items:center;justify-content:center;z-index:200}
+  .modal-bg.show{display:flex}
+  .modal{background:var(--card);border-radius:14px;padding:22px 24px;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .modal h4{margin:0 0 6px;font-size:16px}
+  .modal .note{margin:0 0 14px}
+  .reason-opt{display:block;width:100%;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);font-size:13.5px;font-weight:600;margin-bottom:6px;cursor:pointer}
+  .reason-opt:hover{background:var(--lilac-bg);border-color:var(--lilac);color:var(--violet-d)}
+  .modal input{margin-top:4px}
+  .modal-row{display:flex;gap:8px;margin-top:12px}
+  .modal-row button{flex:1}
+
+  /* status chips & summary cards for Deliveries + Live tracking */
+  .chip.sm{font-size:11px;padding:3px 10px}
+  .chip.ok-g{background:#eaf7ee;color:var(--ok);border-color:#cfe9d4}
+  .chip.prog{background:#eef0ff;color:#3730a3;border-color:#c7d2fe}
+  .chip.warn{background:#fff6e5;color:#92400e;border-color:#fde68a}
+  .chip.gone{background:#f3f3f5;color:var(--muted);border-color:var(--line)}
+  .stats-row{display:flex;gap:8px;margin:0 0 12px;flex-wrap:wrap}
+  .stat-pill{background:var(--lilac-bg);color:var(--violet-d);padding:6px 12px;border-radius:20px;font-weight:600;font-size:12.5px}
+  .filter-row{display:flex;gap:6px;margin:0 0 14px;flex-wrap:wrap}
+  .filter-btn{background:#fff;border:1px solid var(--line);border-radius:20px;padding:5px 14px;font-size:12.5px;font-weight:600;color:var(--ink-2);cursor:pointer}
+  .filter-btn.active{background:var(--lilac-bg);border-color:var(--lilac);color:var(--violet-d)}
+  .filter-btn:hover:not(.active){background:#f5f4f9}
+  tr.clickable{cursor:pointer}
+  tr.clickable:hover{background:#f8f7fc}
+  .summary-card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:#fafafb;margin-top:12px}
+  .summary-card.ok{background:#eaf7ee;border-color:#cfe9d4}
+  .summary-card.gone{background:#f3f3f5}
+  .summary-card h4{margin:0 0 8px;font-size:14.5px}
+  .summary-card .kv{display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:var(--ink-2)}
+  .summary-card .kv b{color:var(--ink)}
   .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:5px}
   button.copy{background:none;border:1px solid var(--line);color:var(--muted);padding:5px 10px;font-size:11.5px;margin:0}
   button.copy:hover{background:#f5f4f9;color:var(--violet)}
@@ -109,6 +140,7 @@
       <a data-p="tracking" onclick="nav('tracking')">◉ Live tracking</a>
       <a data-p="wallet" onclick="nav('wallet')">▦ Wallet</a>
       <a data-p="webhooks" onclick="nav('webhooks')">⇄ Webhooks</a>
+      <a data-p="docs" onclick="nav('docs')">⌨ API reference</a>
     </nav>
     <div class="side-foot"><b>Business 3 · Group 6</b></div>
   </aside>
@@ -173,8 +205,15 @@
       <!-- DELIVERIES -->
       <section class="page" id="p-deliveries">
         <div class="card"><h3>All deliveries</h3><p class="d">Scoped to your business — one business can never see another's (tenant isolation).</p>
-          <table><thead><tr><th>Code</th><th>Reference</th><th>Status</th><th>Vehicle</th><th style="text-align:right">Price</th><th></th></tr></thead>
-          <tbody id="delivRows"><tr><td colspan="6" class="empty">No deliveries yet.</td></tr></tbody></table></div>
+          <div class="stats-row" id="delivStats"></div>
+          <div class="filter-row">
+            <button class="filter-btn active" data-f="all" onclick="filterDeliv('all')">All</button>
+            <button class="filter-btn" data-f="progress" onclick="filterDeliv('progress')">In progress</button>
+            <button class="filter-btn" data-f="delivered" onclick="filterDeliv('delivered')">Delivered</button>
+            <button class="filter-btn" data-f="cancelled" onclick="filterDeliv('cancelled')">Cancelled</button>
+          </div>
+          <table><thead><tr><th>Code</th><th>Reference</th><th>Status</th><th>Vehicle</th><th>Created</th><th style="text-align:right">Price</th><th></th></tr></thead>
+          <tbody id="delivRows"><tr><td colspan="7" class="empty">No deliveries yet.</td></tr></tbody></table></div>
       </section>
 
       <!-- TRACKING -->
@@ -184,8 +223,11 @@
           <div class="card"><h3>Driver on the map</h3>
             <div class="mapwrap" id="mapBox"></div>
             <div class="driver-card" id="driverCard"></div>
-            <button class="sm" id="btnAdvance" onclick="advance()">Advance (simulate driver)</button>
-            <button class="ghost sm" id="btnCancel" onclick="cancelErrand()">Cancel delivery</button>
+            <div id="trackActions">
+              <button class="sm" id="btnAdvance" onclick="advance()">Advance (simulate driver)</button>
+              <button class="ghost sm" id="btnCancel" onclick="cancelErrand()">Cancel delivery</button>
+            </div>
+            <div id="trackSummary"></div>
             <div class="note" id="trackMsg"></div>
           </div>
           <div class="card"><h3>Status timeline</h3><div id="trackMeta"></div><ul class="tl" id="timeline"></ul></div>
@@ -232,6 +274,21 @@
         </div>
       </section>
 
+      <!-- DOCS -->
+      <section class="page" id="p-docs">
+        <div class="card"><h3>Quickstart</h3><p class="d">Three calls: get a key, price a route, create a delivery. Pick a language.</p>
+          <div class="tabs"><button class="on" onclick="lang('curl')">cURL</button><button onclick="lang('py')">Python</button><button onclick="lang('js')">JavaScript</button><button class="copy" style="margin-left:auto" onclick="copy($('codeBlock').innerText)">Copy</button></div>
+          <pre id="codeBlock"></pre></div>
+        <div class="card"><h3>Endpoints</h3><table><thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead><tbody>
+          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/keys · /keys/rotate · /keys/revoke</td><td>Key lifecycle</td></tr>
+          <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0">/v1/keys/audit</td><td>Audit log</td></tr>
+          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/quotes</td><td>Price a route</td></tr>
+          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/errands</td><td>Create a delivery</td></tr>
+          <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0">/v1/errands/{id}/tracking</td><td>Live tracking + ETA</td></tr>
+          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/errands/{id}/cancel</td><td>Cancel (fee rules)</td></tr>
+          <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0">/v1/wallet · /events</td><td>Wallet statement · webhook events</td></tr>
+        </tbody></table></div>
+      </section>
 
     </div>
   </div>
@@ -244,7 +301,7 @@ const money=n=>"$"+Number(n).toFixed(2);
 const show=(el,h)=>{el.innerHTML=h;el.classList.add("show");};
 const fail=(el,m)=>show(el,'<span class="err">'+m+'</span>');
 const kv=(k,v)=>'<div class="kv"><span>'+k+'</span><b>'+v+'</b></div>';
-const TITLES={overview:"Overview",create:"Create delivery",deliveries:"Deliveries",tracking:"Live tracking",wallet:"Wallet",webhooks:"Webhooks"};
+const TITLES={overview:"Overview",create:"Create delivery",deliveries:"Deliveries",tracking:"Live tracking",wallet:"Wallet",webhooks:"Webhooks",docs:"API reference"};
 let _tt; function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show");clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove("show"),2600);}
 function copy(txt){(navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast("Copied to clipboard")).catch(()=>toast("Copy not available"));}
 
@@ -257,12 +314,14 @@ function nav(p){
   if(p==="deliveries")loadErrands();
   if(p==="wallet")loadWallet();
   if(p==="webhooks")loadEvents();
-  if(p==="tracking")refreshTrack();
+  if(p==="tracking"){ refreshTrack(); startTrackPolling(); } else { stopGraceCountdown(); stopTrackPolling(); }
+  if(p==="docs")lang(CURLANG);
 }
 
-async function api(path,method,body){
+async function api(path,method,body,extra){
   const h={"Content-Type":"application/json"};
   if(API_KEY) h["Authorization"]="Bearer "+API_KEY;
+  if(extra) Object.assign(h,extra);
   const r=await fetch(path,{method,headers:h,body:body?JSON.stringify(body):undefined});
   const d=await r.json().catch(()=>({})); return {ok:r.ok,status:r.status,data:d};
 }
@@ -315,8 +374,8 @@ async function loadWallet(){
     : '<tr><td colspan="4" class="empty">No transactions yet.</td></tr>';
 }
 async function topup(amount){
-  amount=amount||50;
   if(!API_KEY){ toast("Generate a key first — on the “Create delivery” page"); return; }
+  amount=amount||50;
   const r=await api("/v1/wallet/topup","POST",{amount});
   if(!r.ok){ toast("Top-up failed ("+((r.data.error&&r.data.error.message)||r.status)+")"); return; }
   loadWallet(); toast("Topped up "+money(amount));
@@ -351,6 +410,19 @@ async function createErrand(){
   loadWallet(); toast("Delivery created · wallet charged "+money(e.pricing.charge_total)); setTimeout(()=>{nav("tracking");},700);
 }
 
+// Quiet background poll of the tracking endpoint while the Live tracking page is open.
+let _pollTimer=null;
+function startTrackPolling(){ stopTrackPolling(); _pollTimer=setInterval(()=>{ if(ERRAND_ID) refreshTrack(); }, 3000); }
+function stopTrackPolling(){ if(_pollTimer){ clearInterval(_pollTimer); _pollTimer=null; } }
+function ago(iso){
+  const s=Math.max(0,Math.round((Date.now()-new Date(iso).getTime())/1000));
+  if(s<10) return "just now";
+  if(s<60) return s+"s ago";
+  const m=Math.round(s/60);
+  if(m<60) return m+" min ago";
+  const h=Math.round(m/60);
+  return h+"h ago";
+}
 async function refreshTrack(){
   if(!ERRAND_ID){ $("trackEmpty").style.display="block"; $("trackView").style.display="none"; return; }
   const r=await api("/v1/errands/"+ERRAND_ID+"/tracking","GET");
@@ -370,19 +442,96 @@ function renderTrack(t){
   let grid=''; for(let i=1;i<8;i++){grid+='<line x1="'+(i*65)+'" y1="0" x2="'+(i*65)+'" y2="300" stroke="#e4e2ee"/>';}
   for(let i=1;i<5;i++){grid+='<line x1="0" y1="'+(i*60)+'" x2="520" y2="'+(i*60)+'" stroke="#e4e2ee"/>';}
   let driver=''; if(t.driver){const [vx,vy]=project({lat:t.driver.lat,lng:t.driver.lng},box);
-    driver='<circle cx="'+vx+'" cy="'+vy+'" r="12" fill="#5202d9" opacity=".25"><animate attributeName="r" values="12;20;12" dur="1.6s" repeatCount="indefinite"/></circle><circle cx="'+vx+'" cy="'+vy+'" r="7" fill="#5202d9" stroke="#fff" stroke-width="2"/>';}
+    // Smoothly animate the driver dot from its previous position (if any) to the new one.
+    const fx = (_lastDriver && _lastDriver.id===t.errand_id) ? _lastDriver.x : vx;
+    const fy = (_lastDriver && _lastDriver.id===t.errand_id) ? _lastDriver.y : vy;
+    const anim = (fx!==vx || fy!==vy)
+      ? '<animate attributeName="cx" from="'+fx+'" to="'+vx+'" dur="0.8s" fill="freeze"/>'
+       +'<animate attributeName="cy" from="'+fy+'" to="'+vy+'" dur="0.8s" fill="freeze"/>'
+      : '';
+    driver='<circle cx="'+vx+'" cy="'+vy+'" r="12" fill="#5202d9" opacity=".25"><animate attributeName="r" values="12;20;12" dur="1.6s" repeatCount="indefinite"/>'+anim+'</circle>'
+          +'<circle cx="'+vx+'" cy="'+vy+'" r="7" fill="#5202d9" stroke="#fff" stroke-width="2">'+anim+'</circle>';
+    _lastDriver={id:t.errand_id, x:vx, y:vy};
+  } else { _lastDriver=null; }
   $("mapBox").innerHTML='<svg viewBox="0 0 520 300" width="100%">'+grid+
     '<line x1="'+px+'" y1="'+py+'" x2="'+dx+'" y2="'+dy+'" stroke="#5202d9" stroke-width="2.5" stroke-dasharray="6 5"/>'+
     '<circle cx="'+px+'" cy="'+py+'" r="7" fill="#fff" stroke="#6b6b6b" stroke-width="3"/><text x="'+px+'" y="'+(py-12)+'" font-size="11" fill="#6b6b6b" text-anchor="middle" font-weight="700">PICKUP</text>'+
     '<circle cx="'+dx+'" cy="'+dy+'" r="7" fill="#5202d9"/><text x="'+dx+'" y="'+(dy-12)+'" font-size="11" fill="#5202d9" text-anchor="middle" font-weight="700">DROP-OFF</text>'+driver+'</svg>';
-  if(t.driver){const d=t.driver;$("driverCard").innerHTML='<div class="avatar">'+d.name[0]+'</div><div style="flex:1"><b>'+d.name+'</b> · ★ '+d.rating+'<br><span class="note" style="margin:0">'+d.vehicle+' · '+d.plate+' · '+(d.phone||'')+'</span></div>'+(t.eta_minutes?'<div style="text-align:right"><b style="font-size:18px;color:var(--violet)">'+t.eta_minutes+' min</b><br><span class="note" style="margin:0">ETA</span></div>':'');}
+  if(t.driver){const d=t.driver;const clock=t.eta_at?new Date(t.eta_at).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}):'';const dist=t.distance_remaining_km?' · '+t.distance_remaining_km+' km':'';$("driverCard").innerHTML='<div class="avatar">'+d.name[0]+'</div><div style="flex:1"><b>'+d.name+'</b> · ★ '+d.rating+'<br><span class="note" style="margin:0">'+d.vehicle+' · '+d.plate+' · '+(d.phone||'')+'</span></div>'+(t.eta_minutes?'<div style="text-align:right"><b style="font-size:18px;color:var(--violet)">'+t.eta_minutes+' min</b><br><span class="note" style="margin:0">ETA'+(clock?' · '+clock:'')+dist+'</span></div>':'');}
   else $("driverCard").innerHTML='<div class="note" style="margin:0">No driver assigned yet — advance to dispatch.</div>';
   $("trackMeta").innerHTML=kv("Status","<b>"+t.status+"</b>")+kv("Handover code",t.delivery_code);
-  $("timeline").innerHTML=(t.timeline||[]).map(s=>'<li><b>'+s.status+'</b> · '+s.at.slice(11,19)+'</li>').join("");
-  // disable actions that no longer apply (finished or past pickup)
+  $("timeline").innerHTML=(t.timeline||[]).map(s=>'<li><b>'+s.status+'</b> · '+s.at.slice(11,19)+' <span class="note" style="margin:0">· '+ago(s.at)+'</span></li>').join("");
+  // Terminal state: hide Advance/Cancel and show a persistent summary card instead.
   const terminal=(t.status==="delivered"||t.status==="cancelled");
+  $("trackActions").style.display = terminal ? "none" : "";
+  $("trackSummary").innerHTML = terminal ? renderSummary(t) : "";
   $("btnAdvance").disabled=terminal;
   $("btnCancel").disabled=terminal;
+  // Label the Cancel button with the fee it would charge right now (0 before a driver accepts).
+  const c=t.cancellation||{};
+  const feeNow=(c.fee_cents||0)/100;
+  const grace=c.grace_seconds_remaining||0;
+  if(c.allowed && grace>0){ startGraceCountdown(grace); }
+  else {
+    stopGraceCountdown();
+    $("btnCancel").textContent = c.allowed
+      ? (feeNow>0 ? "Cancel delivery · $"+feeNow.toFixed(2)+" fee"
+         : "Cancel delivery (no fee)")
+      : "Cancel delivery";
+  }
+}
+
+// Last-rendered driver pixel position, so a redraw can animate to the new spot.
+let _lastDriver=null;
+function renderSummary(t){
+  if(t.status==="delivered"){
+    const tl=t.timeline||[];
+    const first=tl[0]&&tl[0].at, last=tl[tl.length-1]&&tl[tl.length-1].at;
+    const mins = (first && last) ? Math.max(1, Math.round((new Date(last)-new Date(first))/60000)) : null;
+    return '<div class="summary-card ok"><h4>✓ Delivered</h4>'
+      + '<div class="kv"><span>Handover code</span><b>'+t.delivery_code+'</b></div>'
+      + (mins?'<div class="kv"><span>End-to-end</span><b>'+mins+' min</b></div>':'')
+      + '<div class="kv"><span>Driver</span><b>'+(t.driver?t.driver.name:'—')+'</b></div>'
+      + '</div>';
+  }
+  const c=t.cancellation_result||{};
+  return '<div class="summary-card gone"><h4>✕ Cancelled</h4>'
+    + (c.from_stage?'<div class="kv"><span>Cancelled from</span><b>'+c.from_stage+'</b></div>':'')
+    + (c.reason?'<div class="kv"><span>Reason</span><b>'+c.reason+'</b></div>':'')
+    + ('fee' in c?'<div class="kv"><span>Fee</span><b>'+money(c.fee)+'</b></div>':'')
+    + ('refund' in c?'<div class="kv"><span>Refunded to wallet</span><b>'+money(c.refund)+'</b></div>':'')
+    + '</div>';
+}
+
+// Live countdown that ticks the grace window down one second at a time, with a
+// progress bar across the Cancel button. When it hits zero we refetch tracking
+// so the server-side fee preview kicks in.
+let _graceTimer=null;
+function stopGraceCountdown(){
+  if(_graceTimer){ clearInterval(_graceTimer); _graceTimer=null; }
+  const b=$("btnCancel"); if(b){ b.style.backgroundImage=""; b.style.transition=""; }
+}
+function startGraceCountdown(seconds){
+  stopGraceCountdown();
+  const total=30; let left=seconds;
+  const paint=()=>{
+    const b=$("btnCancel"); if(!b) return;
+    b.textContent="Cancel delivery · free for "+left+"s more";
+    const pct=Math.max(0,Math.min(100,(left/total)*100));
+    b.style.backgroundImage="linear-gradient(to right, var(--lilac-bg) "+pct+"%, transparent "+pct+"%)";
+    b.style.transition="background-image 0.8s linear";
+  };
+  paint();
+  _graceTimer=setInterval(()=>{
+    left-=1;
+    if(left<=0){
+      stopGraceCountdown();
+      toast("Free-cancel window ended — a fee now applies.");
+      refreshTrack();
+      return;
+    }
+    paint();
+  },1000);
 }
 async function advance(){
   const r=await api("/v1/errands/"+ERRAND_ID+"/advance","POST",{});
@@ -390,22 +539,100 @@ async function advance(){
   else{ toast(r.data.status==="delivered"?"Delivered ✓":"Status → "+r.data.status); }
   refreshTrack(); loadEvents();
 }
+// Promise-based reason picker — resolves to a string or null (cancelled).
+function pickReason(summary){
+  return new Promise(resolve=>{
+    const m=$("reasonModal"), other=$("reasonOther");
+    $("reasonModal").querySelector(".note").textContent=summary;
+    other.value="";
+    const close=val=>{ m.classList.remove("show"); cleanup(); resolve(val); };
+    function cleanup(){
+      m.querySelectorAll(".reason-opt").forEach(b=>b.onclick=null);
+      $("reasonCancel").onclick=null; $("reasonSubmit").onclick=null;
+    }
+    m.querySelectorAll(".reason-opt").forEach(b=>{ b.onclick=()=>close(b.dataset.r); });
+    $("reasonCancel").onclick=()=>close(undefined);  // undefined = user backed out
+    $("reasonSubmit").onclick=()=>close(other.value.trim()||null);
+    m.classList.add("show"); other.focus();
+  });
+}
 async function cancelErrand(){
-  const r=await api("/v1/errands/"+ERRAND_ID+"/cancel","POST",{});
+  // Pull the latest preview so the dialog shows the real fee / refund.
+  const t=await api("/v1/errands/"+ERRAND_ID+"/tracking","GET");
+  let reason=null;
+  if(t.ok && t.data.cancellation && t.data.cancellation.allowed){
+    const fee=(t.data.cancellation.fee_cents||0)/100, ref=(t.data.cancellation.refund_cents||0)/100;
+    const grace=t.data.cancellation.grace_seconds_remaining||0;
+    const summary = grace>0
+      ? "Still free for "+grace+"s · $"+ref.toFixed(2)+" refund to the wallet."
+      : fee>0
+        ? "A $"+fee.toFixed(2)+" fee applies — you'll be refunded $"+ref.toFixed(2)+" to the wallet."
+        : "You'll be refunded $"+ref.toFixed(2)+" to the wallet (no fee).";
+    const picked=await pickReason(summary);
+    if(picked===undefined) return;        // user clicked Back
+    reason=picked;                        // may be null (no reason), a preset slug, or custom text
+  }
+  const headers={};
+  // Browser-generated idempotency key: a flaky retry of this exact cancel won't double-fire the webhook.
+  headers["Idempotency-Key"]="cancel-"+ERRAND_ID+"-"+Date.now();
+  const r=await api("/v1/errands/"+ERRAND_ID+"/cancel","POST", reason?{reason}:{}, headers);
   if(r.status===409){$("trackMsg").innerHTML='<b style="color:var(--err)">'+((r.data.error&&r.data.error.message)||"Can't cancel this delivery.")+'</b>';refreshTrack();return;}
   if(r.ok){$("trackMsg").innerHTML='<b style="color:var(--violet)">Cancelled.</b> Fee '+money(r.data.fee)+', refunded '+money(r.data.refund)+' to the wallet.'; refreshTrack(); loadWallet(); loadEvents(); toast("Cancelled · refunded "+money(r.data.refund));}
 }
 
 /* deliveries + overview */
+let _allDeliv=[], _delivFilter="all";
+function statusChip(s){
+  const cls = s==="delivered"?"ok-g"
+    : s==="cancelled"?"gone"
+    : (s==="pending"||s==="pending_payment"||s==="broadcasted")?"warn"
+    : "prog";
+  return '<span class="chip '+cls+' sm">'+s+'</span>';
+}
+function filterDeliv(f){
+  _delivFilter=f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active', b.dataset.f===f));
+  renderDeliveries();
+}
+function renderDeliveries(){
+  const list=_allDeliv;
+  const stats={progress:0, delivered:0, cancelled:0};
+  for(const e of list){
+    if(e.status==="delivered") stats.delivered++;
+    else if(e.status==="cancelled") stats.cancelled++;
+    else stats.progress++;
+  }
+  $("delivStats").innerHTML =
+    '<span class="stat-pill">'+stats.progress+' in progress</span>' +
+    '<span class="stat-pill">'+stats.delivered+' delivered</span>' +
+    '<span class="stat-pill">'+stats.cancelled+' cancelled</span>';
+  const filtered = list.filter(e=>{
+    if(_delivFilter==="all") return true;
+    if(_delivFilter==="progress") return e.status!=="delivered" && e.status!=="cancelled";
+    return e.status===_delivFilter;
+  });
+  $("delivRows").innerHTML = filtered.length
+    ? filtered.map(e=>'<tr class="clickable" onclick="track(\''+e.errand_id+'\')">'
+        +'<td><b>'+e.delivery_code+'</b> '+(e.test_mode?'<span class="badge">TEST</span>':'')+'</td>'
+        +'<td>'+(e.reference||"—")+'</td>'
+        +'<td>'+statusChip(e.status)+'</td>'
+        +'<td>'+e.vehicle_type+'</td>'
+        +'<td>'+(e.created_at?ago(e.created_at):'—')+'</td>'
+        +'<td style="text-align:right">'+money(e.pricing.charge_total)+'</td>'
+        +'<td><button class="ghost sm" style="margin:0" onclick="event.stopPropagation();track(\''+e.errand_id+'\')">Track</button></td>'
+        +'</tr>').join("")
+    : '<tr><td colspan="7" class="empty">No deliveries match this filter.</td></tr>';
+}
 async function loadErrands(){
   const r=await api("/v1/errands","GET"); if(!r.ok)return;
-  const list=r.data.errands||[];
-  $("mDeliv").textContent=list.length; $("mBooked").textContent=money(list.reduce((s,e)=>s+Number(e.pricing.charge_total),0));
-  const row=e=>'<tr><td><b>'+e.delivery_code+'</b> '+(e.test_mode?'<span class="badge">TEST</span>':'')+'</td><td>'+e.status+'</td><td style="text-align:right">'+money(e.pricing.charge_total)+'</td></tr>';
-  $("ovDeliv").innerHTML=list.length?list.slice(0,5).map(row).join(""):'<tr><td colspan="3" class="empty">Nothing yet.</td></tr>';
-  $("delivRows").innerHTML=list.length?list.map(e=>'<tr><td><b>'+e.delivery_code+'</b> '+(e.test_mode?'<span class="badge">TEST</span>':'')+'</td><td>'+(e.reference||"—")+'</td><td>'+e.status+'</td><td>'+e.vehicle_type+'</td><td style="text-align:right">'+money(e.pricing.charge_total)+'</td><td><button class="ghost sm" style="margin:0" onclick="track(\''+e.errand_id+'\')">Track</button></td></tr>').join(""):'<tr><td colspan="6" class="empty">No deliveries yet.</td></tr>';
+  _allDeliv = r.data.errands||[];
+  $("mDeliv").textContent=_allDeliv.length;
+  $("mBooked").textContent=money(_allDeliv.reduce((s,e)=>s+Number(e.pricing.charge_total),0));
+  const ovRow=e=>'<tr><td><b>'+e.delivery_code+'</b> '+(e.test_mode?'<span class="badge">TEST</span>':'')+'</td><td>'+statusChip(e.status)+'</td><td style="text-align:right">'+money(e.pricing.charge_total)+'</td></tr>';
+  $("ovDeliv").innerHTML=_allDeliv.length?_allDeliv.slice(0,5).map(ovRow).join(""):'<tr><td colspan="3" class="empty">Nothing yet.</td></tr>';
+  renderDeliveries();
 }
-function track(id){ if(id!==ERRAND_ID) $("trackMsg").innerHTML=""; ERRAND_ID=id; nav("tracking"); }
+function track(id){ if(id!==ERRAND_ID){ $("trackMsg").innerHTML=""; stopGraceCountdown(); } ERRAND_ID=id; nav("tracking"); }
 
 /* webhooks (team) */
 async function loadEvents(){
@@ -424,7 +651,35 @@ async function registerWebhook(){
   toast("Webhook endpoint added");
 }
 
+/* docs code samples */
+let CURLANG="curl";
+const SAMPLES={
+ curl:'<span class="c"># 1. issue a key, 2. quote, 3. create</span>\ncurl -s api.aerrand.com/v1/quotes \\\n  -H <span class="s">"Authorization: Bearer ak_test_…"</span> \\\n  -d <span class="s">\'{"pickup":{"lat":"42.31","lng":"-83.03"},\n      "stops":[{"lat":"42.28","lng":"-82.99","parcels":{"small":2}}]}\'</span>\n\ncurl -s api.aerrand.com/v1/errands \\\n  -H <span class="s">"Authorization: Bearer ak_test_…"</span> \\\n  -d <span class="s">\'{"quote_id":"qt_…","dropoff":{…}}\'</span>',
+ py:'<span class="k">import</span> requests\nh = {<span class="s">"Authorization"</span>: <span class="s">"Bearer ak_test_…"</span>}\n\nq = requests.post(<span class="s">"https://api.aerrand.com/v1/quotes"</span>, headers=h,\n    json={<span class="s">"pickup"</span>:{…}, <span class="s">"stops"</span>:[{…}]}).json()\n\ne = requests.post(<span class="s">"https://api.aerrand.com/v1/errands"</span>, headers=h,\n    json={<span class="s">"quote_id"</span>: q[<span class="s">"quote_id"</span>], <span class="s">"dropoff"</span>:{…}}).json()\n<span class="k">print</span>(e[<span class="s">"errand_id"</span>], e[<span class="s">"delivery_code"</span>])',
+ js:'<span class="k">const</span> h = { Authorization: <span class="s">"Bearer ak_test_…"</span> };\n\n<span class="k">const</span> q = <span class="k">await</span> fetch(<span class="s">"/v1/quotes"</span>, { method:<span class="s">"POST"</span>, headers:h,\n  body: JSON.stringify({ pickup:{…}, stops:[{…}] }) }).then(r=>r.json());\n\n<span class="k">const</span> e = <span class="k">await</span> fetch(<span class="s">"/v1/errands"</span>, { method:<span class="s">"POST"</span>, headers:h,\n  body: JSON.stringify({ quote_id:q.quote_id, dropoff:{…} }) }).then(r=>r.json());'
+};
+function lang(l){CURLANG=l;$("codeBlock").innerHTML=SAMPLES[l];document.querySelectorAll(".tabs button").forEach((b,i)=>b.classList.toggle("on",["curl","py","js"][i]===l));}
+lang("curl");
+
 </script>
 <div id="toast"></div>
+
+<div class="modal-bg" id="reasonModal">
+  <div class="modal">
+    <h4>Why are you cancelling?</h4>
+    <p class="note">Pick a reason, or write your own. Helps us improve the service.</p>
+    <button class="reason-opt" data-r="customer_changed_mind">Customer changed their mind</button>
+    <button class="reason-opt" data-r="wrong_address">Wrong address or recipient info</button>
+    <button class="reason-opt" data-r="package_not_ready">Package isn't ready yet</button>
+    <button class="reason-opt" data-r="driver_too_slow">Driver taking too long</button>
+    <button class="reason-opt" data-r="no_longer_needed">No longer needed</button>
+    <label style="margin-top:8px;display:block">Something else (optional)</label>
+    <input id="reasonOther" type="text" maxlength="60" placeholder="Type your own reason…">
+    <div class="modal-row">
+      <button class="ghost sm" id="reasonCancel">Keep delivery</button>
+      <button class="sm" id="reasonSubmit">Cancel with this reason</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
