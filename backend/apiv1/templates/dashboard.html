@@ -237,7 +237,7 @@
       <!-- WALLET -->
       <section class="page" id="p-wallet">
         <div class="cards" style="grid-template-columns:repeat(3,1fr)">
-          <div class="metric"><div class="l">Balance</div><div class="v" id="wBig" style="color:var(--violet);font-size:30px">—</div></div>
+          <div class="metric"><div class="l">Balance</div><div class="v" id="wBig" style="color:var(--violet);font-size:30px">—</div><div id="wLow" style="display:none;color:var(--err);font-size:12px;font-weight:600;margin-top:4px">⚠ Low balance — top up</div></div>
           <div class="metric"><div class="l">Total added</div><div class="v pos" id="wAdded">—</div></div>
           <div class="metric"><div class="l">Total spent</div><div class="v neg" id="wSpent">—</div></div>
         </div>
@@ -248,7 +248,7 @@
             <button class="ghost sm" onclick="topup(50)">+ $50</button>
             <button class="ghost sm" onclick="topup(100)">+ $100</button>
           </div></div>
-        <div class="card"><h3>Transaction statement</h3>
+        <div class="card"><h3 style="display:flex;align-items:center;justify-content:space-between">Transaction statement <button class="ghost sm" style="margin:0" onclick="downloadCsv()">Download CSV</button></h3>
           <table><thead><tr><th>Type</th><th>Note</th><th>When</th><th style="text-align:right">Amount</th></tr></thead>
           <tbody id="txnRows"><tr><td colspan="4" class="empty">No transactions yet.</td></tr></tbody></table></div>
       </section>
@@ -365,6 +365,8 @@ async function loadWallet(){
   $("walletChip").textContent="Wallet "+money(r.data.balance);
   $("mWallet").textContent=money(r.data.balance); $("wBig").textContent=money(r.data.balance);
   const tx=r.data.transactions||[];
+  window._txns=tx;  // keep the full statement so it can be exported as CSV
+  $("wLow").style.display = r.data.balance < 20 ? "block" : "none";  // team spec: warn below $20
   let added=0, spent=0;
   tx.forEach(t=>{ if(t.kind==="topup") added+=t.amount; else if(t.kind==="charge") spent+=-t.amount; });
   $("wAdded").textContent="+"+money(added);
@@ -372,6 +374,17 @@ async function loadWallet(){
   const label={topup:"Top-up",charge:"Charge",refund:"Refund"};
   $("txnRows").innerHTML = tx.length? tx.map(t=>'<tr><td><span class="badge">'+(label[t.kind]||t.kind)+'</span></td><td>'+t.note+'</td><td>'+t.at.slice(5,16).replace("T"," ")+'</td><td style="text-align:right" class="'+(t.amount<0?'neg':'pos')+'">'+(t.amount<0?'':'+')+money(t.amount)+'</td></tr>').join("")
     : '<tr><td colspan="4" class="empty">No transactions yet.</td></tr>';
+}
+function downloadCsv(){
+  const tx=window._txns||[];
+  if(!tx.length){ toast("No transactions to export"); return; }
+  const rows=[["Type","Note","When","Amount (CAD)"]].concat(
+    tx.map(t=>[t.kind, t.note, t.at.slice(0,19).replace("T"," "), t.amount]));
+  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(",")).join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="wallet-statement.csv"; a.click(); URL.revokeObjectURL(a.href);
+  toast("Statement downloaded");
 }
 async function topup(amount){
   if(!API_KEY){ toast("Generate a key first — on the “Create delivery” page"); return; }
