@@ -140,7 +140,6 @@
       <a data-p="tracking" onclick="nav('tracking')">◉ Live tracking</a>
       <a data-p="wallet" onclick="nav('wallet')">▦ Wallet</a>
       <a data-p="webhooks" onclick="nav('webhooks')">⇄ Webhooks</a>
-      <a data-p="docs" onclick="nav('docs')">⌨ API reference</a>
     </nav>
     <div class="side-foot"><b>Business 3 · Group 6</b></div>
   </aside>
@@ -226,6 +225,7 @@
             <div id="trackActions">
               <button class="sm" id="btnAdvance" onclick="advance()">Advance (simulate driver)</button>
               <button class="ghost sm" id="btnCancel" onclick="cancelErrand()">Cancel delivery</button>
+              <button class="sm" id="btnProof" onclick="openProof()" style="display:none;background:var(--violet)">Confirm delivery (proof)</button>
             </div>
             <div id="trackSummary"></div>
             <div class="note" id="trackMsg"></div>
@@ -237,7 +237,7 @@
       <!-- WALLET -->
       <section class="page" id="p-wallet">
         <div class="cards" style="grid-template-columns:repeat(3,1fr)">
-          <div class="metric"><div class="l">Balance</div><div class="v" id="wBig" style="color:var(--violet);font-size:30px">—</div><div id="wLow" style="display:none;color:var(--err);font-size:12px;font-weight:600;margin-top:4px">⚠ Low balance — top up</div></div>
+          <div class="metric"><div class="l">Balance</div><div class="v" id="wBig" style="color:var(--violet);font-size:30px">—</div></div>
           <div class="metric"><div class="l">Total added</div><div class="v pos" id="wAdded">—</div></div>
           <div class="metric"><div class="l">Total spent</div><div class="v neg" id="wSpent">—</div></div>
         </div>
@@ -248,7 +248,7 @@
             <button class="ghost sm" onclick="topup(50)">+ $50</button>
             <button class="ghost sm" onclick="topup(100)">+ $100</button>
           </div></div>
-        <div class="card"><h3 style="display:flex;align-items:center;justify-content:space-between">Transaction statement <button class="ghost sm" style="margin:0" onclick="downloadCsv()">Download CSV</button></h3>
+        <div class="card"><h3>Transaction statement</h3>
           <table><thead><tr><th>Type</th><th>Note</th><th>When</th><th style="text-align:right">Amount</th></tr></thead>
           <tbody id="txnRows"><tr><td colspan="4" class="empty">No transactions yet.</td></tr></tbody></table></div>
       </section>
@@ -275,21 +275,6 @@
       </section>
 
       <!-- DOCS -->
-      <section class="page" id="p-docs">
-        <div class="card"><h3>Quickstart</h3><p class="d">Three calls: get a key, price a route, create a delivery. Pick a language.</p>
-          <div class="tabs"><button class="on" onclick="lang('curl')">cURL</button><button onclick="lang('py')">Python</button><button onclick="lang('js')">JavaScript</button><button class="copy" style="margin-left:auto" onclick="copy($('codeBlock').innerText)">Copy</button></div>
-          <pre id="codeBlock"></pre></div>
-        <div class="card"><h3>Endpoints</h3><table><thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead><tbody>
-          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/keys · /keys/rotate · /keys/revoke</td><td>Key lifecycle</td></tr>
-          <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0">/v1/keys/audit</td><td>Audit log</td></tr>
-          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/quotes</td><td>Price a route</td></tr>
-          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/errands</td><td>Create a delivery</td></tr>
-          <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0">/v1/errands/{id}/tracking</td><td>Live tracking + ETA</td></tr>
-          <tr><td><span class="m post">POST</span></td><td class="mono" style="background:none;border:0">/v1/errands/{id}/cancel</td><td>Cancel (fee rules)</td></tr>
-          <tr><td><span class="m get">GET</span></td><td class="mono" style="background:none;border:0">/v1/wallet · /events</td><td>Wallet statement · webhook events</td></tr>
-        </tbody></table></div>
-      </section>
-
     </div>
   </div>
 </div>
@@ -301,7 +286,7 @@ const money=n=>"$"+Number(n).toFixed(2);
 const show=(el,h)=>{el.innerHTML=h;el.classList.add("show");};
 const fail=(el,m)=>show(el,'<span class="err">'+m+'</span>');
 const kv=(k,v)=>'<div class="kv"><span>'+k+'</span><b>'+v+'</b></div>';
-const TITLES={overview:"Overview",create:"Create delivery",deliveries:"Deliveries",tracking:"Live tracking",wallet:"Wallet",webhooks:"Webhooks",docs:"API reference"};
+const TITLES={overview:"Overview",create:"Create delivery",deliveries:"Deliveries",tracking:"Live tracking",wallet:"Wallet",webhooks:"Webhooks"};
 let _tt; function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show");clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove("show"),2600);}
 function copy(txt){(navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast("Copied to clipboard")).catch(()=>toast("Copy not available"));}
 
@@ -315,7 +300,6 @@ function nav(p){
   if(p==="wallet")loadWallet();
   if(p==="webhooks")loadEvents();
   if(p==="tracking"){ refreshTrack(); startTrackPolling(); } else { stopGraceCountdown(); stopTrackPolling(); }
-  if(p==="docs")lang(CURLANG);
 }
 
 async function api(path,method,body,extra){
@@ -365,8 +349,6 @@ async function loadWallet(){
   $("walletChip").textContent="Wallet "+money(r.data.balance);
   $("mWallet").textContent=money(r.data.balance); $("wBig").textContent=money(r.data.balance);
   const tx=r.data.transactions||[];
-  window._txns=tx;  // keep the full statement so it can be exported as CSV
-  $("wLow").style.display = r.data.balance < 20 ? "block" : "none";  // team spec: warn below $20
   let added=0, spent=0;
   tx.forEach(t=>{ if(t.kind==="topup") added+=t.amount; else if(t.kind==="charge") spent+=-t.amount; });
   $("wAdded").textContent="+"+money(added);
@@ -374,17 +356,6 @@ async function loadWallet(){
   const label={topup:"Top-up",charge:"Charge",refund:"Refund"};
   $("txnRows").innerHTML = tx.length? tx.map(t=>'<tr><td><span class="badge">'+(label[t.kind]||t.kind)+'</span></td><td>'+t.note+'</td><td>'+t.at.slice(5,16).replace("T"," ")+'</td><td style="text-align:right" class="'+(t.amount<0?'neg':'pos')+'">'+(t.amount<0?'':'+')+money(t.amount)+'</td></tr>').join("")
     : '<tr><td colspan="4" class="empty">No transactions yet.</td></tr>';
-}
-function downloadCsv(){
-  const tx=window._txns||[];
-  if(!tx.length){ toast("No transactions to export"); return; }
-  const rows=[["Type","Note","When","Amount (CAD)"]].concat(
-    tx.map(t=>[t.kind, t.note, t.at.slice(0,19).replace("T"," "), t.amount]));
-  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(",")).join("\n");
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
-  a.download="wallet-statement.csv"; a.click(); URL.revokeObjectURL(a.href);
-  toast("Statement downloaded");
 }
 async function topup(amount){
   if(!API_KEY){ toast("Generate a key first — on the “Create delivery” page"); return; }
@@ -472,7 +443,16 @@ function renderTrack(t){
     '<circle cx="'+dx+'" cy="'+dy+'" r="7" fill="#5202d9"/><text x="'+dx+'" y="'+(dy-12)+'" font-size="11" fill="#5202d9" text-anchor="middle" font-weight="700">DROP-OFF</text>'+driver+'</svg>';
   if(t.driver){const d=t.driver;const clock=t.eta_at?new Date(t.eta_at).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}):'';const dist=t.distance_remaining_km?' · '+t.distance_remaining_km+' km':'';$("driverCard").innerHTML='<div class="avatar">'+d.name[0]+'</div><div style="flex:1"><b>'+d.name+'</b> · ★ '+d.rating+'<br><span class="note" style="margin:0">'+d.vehicle+' · '+d.plate+' · '+(d.phone||'')+'</span></div>'+(t.eta_minutes?'<div style="text-align:right"><b style="font-size:18px;color:var(--violet)">'+t.eta_minutes+' min</b><br><span class="note" style="margin:0">ETA'+(clock?' · '+clock:'')+dist+'</span></div>':'');}
   else $("driverCard").innerHTML='<div class="note" style="margin:0">No driver assigned yet — advance to dispatch.</div>';
-  $("trackMeta").innerHTML=kv("Status","<b>"+t.status+"</b>")+kv("Handover code",t.delivery_code);
+  let meta = kv("Status","<b>"+t.status+"</b>") + kv("Handover code", t.delivery_code);
+  if(t.proof_of_delivery){
+    const p = t.proof_of_delivery;
+    meta += '<div style="margin:12px 0 4px"><span class="chip sm prog">Proof of delivery</span></div>';
+    meta += kv("Received by", p.recipient_name || "—");
+    meta += kv("Code verified", p.code_verified ? "✓ yes" : "✗ no");
+    meta += kv("Confirmed", new Date(p.confirmed_at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'}));
+    if(p.note) meta += kv("Note", p.note);
+  }
+  $("trackMeta").innerHTML = meta;
   $("timeline").innerHTML=(t.timeline||[]).map(s=>'<li><b>'+s.status+'</b> · '+s.at.slice(11,19)+' <span class="note" style="margin:0">· '+ago(s.at)+'</span></li>').join("");
   // Terminal state: hide Advance/Cancel and show a persistent summary card instead.
   const terminal=(t.status==="delivered"||t.status==="cancelled");
@@ -480,6 +460,8 @@ function renderTrack(t){
   $("trackSummary").innerHTML = terminal ? renderSummary(t) : "";
   $("btnAdvance").disabled=terminal;
   $("btnCancel").disabled=terminal;
+  // Proof of delivery becomes available once the driver reaches the drop-off.
+  $("btnProof").style.display = (t.status==="arrived_dropoff") ? "" : "none";
   // Label the Cancel button with the fee it would charge right now (0 before a driver accepts).
   const c=t.cancellation||{};
   const feeNow=(c.fee_cents||0)/100;
@@ -552,6 +534,37 @@ async function advance(){
   else{ toast(r.data.status==="delivered"?"Delivered ✓":"Status → "+r.data.status); }
   refreshTrack(); loadEvents();
 }
+// Proof-of-delivery modal — handler opens the dialog, posts to /proof, refreshes tracking.
+async function openProof(){
+  // Pre-fill the code field with the delivery's handover code so the sender can just paste over it.
+  const t=await api("/v1/errands/"+ERRAND_ID+"/tracking","GET");
+  const m=$("proofModal");
+  $("proofCode").value=""; $("proofRecipient").value=""; $("proofNote").value="";
+  if(t.ok && t.data.delivery_code) $("proofCode").placeholder="e.g. "+t.data.delivery_code;
+  const close=()=>{ m.classList.remove("show"); $("proofCancel").onclick=null; $("proofSubmit").onclick=null; };
+  $("proofCancel").onclick=close;
+  $("proofSubmit").onclick=async()=>{
+    const body={
+      delivery_code: $("proofCode").value.trim(),
+      recipient_name: $("proofRecipient").value.trim(),
+      note: $("proofNote").value.trim(),
+    };
+    if(!body.delivery_code){ toast("Delivery code is required."); return; }
+    if(!body.recipient_name){ toast("Recipient name is required."); return; }
+    const r=await api("/v1/errands/"+ERRAND_ID+"/proof","POST",body);
+    if(!r.ok){
+      const msg=(r.data.error&&r.data.error.message)||"Couldn't confirm delivery.";
+      toast(msg);
+      return;
+    }
+    close();
+    toast("Delivered — proof recorded.");
+    refreshTrack(); loadEvents();
+  };
+  m.classList.add("show");
+  $("proofCode").focus();
+}
+
 // Promise-based reason picker — resolves to a string or null (cancelled).
 function pickReason(summary){
   return new Promise(resolve=>{
@@ -664,18 +677,26 @@ async function registerWebhook(){
   toast("Webhook endpoint added");
 }
 
-/* docs code samples */
-let CURLANG="curl";
-const SAMPLES={
- curl:'<span class="c"># 1. issue a key, 2. quote, 3. create</span>\ncurl -s api.aerrand.com/v1/quotes \\\n  -H <span class="s">"Authorization: Bearer ak_test_…"</span> \\\n  -d <span class="s">\'{"pickup":{"lat":"42.31","lng":"-83.03"},\n      "stops":[{"lat":"42.28","lng":"-82.99","parcels":{"small":2}}]}\'</span>\n\ncurl -s api.aerrand.com/v1/errands \\\n  -H <span class="s">"Authorization: Bearer ak_test_…"</span> \\\n  -d <span class="s">\'{"quote_id":"qt_…","dropoff":{…}}\'</span>',
- py:'<span class="k">import</span> requests\nh = {<span class="s">"Authorization"</span>: <span class="s">"Bearer ak_test_…"</span>}\n\nq = requests.post(<span class="s">"https://api.aerrand.com/v1/quotes"</span>, headers=h,\n    json={<span class="s">"pickup"</span>:{…}, <span class="s">"stops"</span>:[{…}]}).json()\n\ne = requests.post(<span class="s">"https://api.aerrand.com/v1/errands"</span>, headers=h,\n    json={<span class="s">"quote_id"</span>: q[<span class="s">"quote_id"</span>], <span class="s">"dropoff"</span>:{…}}).json()\n<span class="k">print</span>(e[<span class="s">"errand_id"</span>], e[<span class="s">"delivery_code"</span>])',
- js:'<span class="k">const</span> h = { Authorization: <span class="s">"Bearer ak_test_…"</span> };\n\n<span class="k">const</span> q = <span class="k">await</span> fetch(<span class="s">"/v1/quotes"</span>, { method:<span class="s">"POST"</span>, headers:h,\n  body: JSON.stringify({ pickup:{…}, stops:[{…}] }) }).then(r=>r.json());\n\n<span class="k">const</span> e = <span class="k">await</span> fetch(<span class="s">"/v1/errands"</span>, { method:<span class="s">"POST"</span>, headers:h,\n  body: JSON.stringify({ quote_id:q.quote_id, dropoff:{…} }) }).then(r=>r.json());'
-};
-function lang(l){CURLANG=l;$("codeBlock").innerHTML=SAMPLES[l];document.querySelectorAll(".tabs button").forEach((b,i)=>b.classList.toggle("on",["curl","py","js"][i]===l));}
-lang("curl");
 
 </script>
 <div id="toast"></div>
+
+<div class="modal-bg" id="proofModal">
+  <div class="modal">
+    <h4>Confirm delivery</h4>
+    <p class="note">Enter the delivery code the sender was given and who received the parcel.</p>
+    <label>Delivery code</label>
+    <input id="proofCode" type="text" maxlength="16" placeholder="e.g. L3SLRN">
+    <label style="margin-top:8px;display:block">Recipient name</label>
+    <input id="proofRecipient" type="text" maxlength="60" placeholder="e.g. Pat Singh">
+    <label style="margin-top:8px;display:block">Note (optional)</label>
+    <input id="proofNote" type="text" maxlength="120" placeholder="e.g. left at front desk">
+    <div class="modal-row">
+      <button class="ghost sm" id="proofCancel">Back</button>
+      <button class="sm" id="proofSubmit">Confirm delivery</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal-bg" id="reasonModal">
   <div class="modal">
