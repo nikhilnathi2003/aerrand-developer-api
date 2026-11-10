@@ -32,6 +32,10 @@ def _events():
     return db.get_db()["webhook_events"]
 
 
+def _deliveries():
+    return db.get_db()["webhook_deliveries"]
+
+
 def register(owner, url, events):
     doc = {
         "id": "we_" + uuid.uuid4().hex[:16],
@@ -78,6 +82,45 @@ def record_event(owner, event_type, errand):
         "signature": _sign(body),
         "at": datetime.now(timezone.utc),
     })
+    # fan the event out to the business's subscribed endpoints (delivery log / outbox)
+    deliver(owner, event_type, errand)
+
+
+def deliver(owner, event_type, errand):
+    """Record a delivery attempt for each endpoint subscribed to this event type.
+
+    This is the outbox the real dispatcher drains: in test mode the outbound HTTP call
+    is simulated and recorded as 'delivered', so the delivery log can be demonstrated
+    end to end without a public receiving server.
+    """
+    delivered = []
+    for ep in _endpoints().find({"business_owner_id": owner, "status": "enabled"}):
+        subscribed = ep.get("events") or ["*"]
+        if "*" not in subscribed and event_type not in subscribed:
+            continue
+        rec = {
+            "id": "whd_" + uuid.uuid4().hex[:16],
+            "business_owner_id": owner,
+            "endpoint_id": ep["id"],
+            "url": ep["url"],
+            "event_type": event_type,
+            "errand_id": errand.get("errand_id"),
+            "status": "delivered",   # simulated success in test mode
+            "attempts": 1,
+            "at": datetime.now(timezone.utc),
+        }
+        _deliveries().insert_one(rec)
+        delivered.append(rec)
+    return delivered
+
+
+def recent_deliveries(owner, limit=25):
+    rows = _deliveries().find({"business_owner_id": owner}).sort("at", -1).limit(limit)
+    return [{
+        "id": r["id"], "endpoint_id": r["endpoint_id"], "url": r["url"],
+        "event_type": r["event_type"], "errand_id": r.get("errand_id"),
+        "status": r["status"], "attempts": r["attempts"], "at": r["at"].isoformat(),
+    } for r in rows]
 
 
 def recent_events(owner, limit=20):
