@@ -566,10 +566,60 @@ def track_errand(request, errand_id):
     })
 
 
+_CANCEL_BLOCK_MESSAGES = {
+    "picked_up": "Can't cancel — the driver has already picked up the parcel.",
+    "in_transit": "Can't cancel — the driver is on the way to the drop-off.",
+    "arrived_dropoff": "Can't cancel — the driver has arrived at the drop-off.",
+    "delivered": "This delivery is already delivered, so it can't be cancelled.",
+    "cancelled": "This delivery is already cancelled.",
+}
+
+
+def _cancel_one(owner, doc, reason):
+    """Perform the fee/refund/webhook work for a single errand and return a result dict."""
+    from_stage = doc["status"]
+    base_fee = lifecycle.cancellation_fee_cents(from_stage, doc["pricing"]["amount_cents"])
+    grace_left = lifecycle.accept_grace_remaining(doc.get("timeline", []), _now())
+    fee_cents = 0 if grace_left > 0 else base_fee
+    refund_cents = 0
+    if doc["payment"]["status"] == "paid":
+        refund_cents = max(0, doc["pricing"]["amount_cents"] - fee_cents)
+        wallet.refund(owner, refund_cents, doc["errand_id"])
+    db.errands().update_one({"errand_id": doc["errand_id"]}, {"$set": {
+        "status": "cancelled",
+        "cancellation": {"fee": round(fee_cents / 100, 2), "refund": round(refund_cents / 100, 2),
+                         "from_stage": from_stage, "reason": reason},
+    }})
+    doc["status"] = "cancelled"
+    webhooks.record_event(owner, "errand.cancelled", doc, extra={
+        "reason": reason,
+        "fee": round(fee_cents / 100, 2),
+        "refund": round(refund_cents / 100, 2),
+        "from_stage": from_stage,
+    })
+    return {
+        "errand_id": doc["errand_id"],
+        "fee": round(fee_cents / 100, 2),
+        "refund": round(refund_cents / 100, 2),
+        "from_stage": from_stage,
+        "reason": reason,
+    }
+
+
 @api_view(["POST"])
 @authentication_classes([ApiKeyAuthentication])
 @permission_classes([IsAuthenticated])
 def cancel_errand(request, errand_id):
+    """Cancel one errand, or (for multi-stop batches) all non-terminal siblings.
+
+    Multi-stop semantics (TRD FR-CANCEL-02):
+      - If the errand belongs to a batch (multi-stop booking) the call operates on
+        every sibling in the batch.
+      - All-or-nothing by default: if any stop can't be cancelled, the whole call
+        is refused with 409 and per-stop reasons; nothing is cancelled.
+      - Pass ``partial: true`` in the body to cancel only the eligible stops and
+        receive the rest under ``skipped``.
+    """
     require_scope(request, "cancel")
     owner = request.user.business_owner_id
     body = request.data or {}
@@ -590,45 +640,57 @@ def cancel_errand(request, errand_id):
     doc = _owned(owner, errand_id)
     if not doc:
         return error_response("errand_not_found", "Errand not found.", 404)
-    if not lifecycle.can_cancel(doc["status"]):
-        msg = {
-            "picked_up": "Can't cancel — the driver has already picked up the parcel.",
-            "in_transit": "Can't cancel — the driver is on the way to the drop-off.",
-            "arrived_dropoff": "Can't cancel — the driver has arrived at the drop-off.",
-            "delivered": "This delivery is already delivered, so it can't be cancelled.",
-            "cancelled": "This delivery is already cancelled.",
-        }.get(doc["status"], "Can't cancel at this stage.")
-        return error_response("cancellation_not_allowed", msg, 409)
-    from_stage = doc["status"]
-    base_fee = lifecycle.cancellation_fee_cents(from_stage, doc["pricing"]["amount_cents"])
-    # Grace window after a driver accepts keeps the cancellation free.
-    grace_left = lifecycle.accept_grace_remaining(doc.get("timeline", []), _now())
-    fee_cents = 0 if grace_left > 0 else base_fee
-    refund_cents = 0
-    if doc["payment"]["status"] == "paid":
-        refund_cents = max(0, doc["pricing"]["amount_cents"] - fee_cents)
-        wallet.refund(owner, refund_cents, errand_id)  # refund to wallet
-    # Accept a free-form reason from the caller (max 60 chars, trimmed);
-    # default to the TRD's business_request when not provided.
+
     raw_reason = (body.get("reason") or "business_request")
     reason = str(raw_reason).strip()[:60] or "business_request"
-    db.errands().update_one({"errand_id": errand_id}, {"$set": {
-        "status": "cancelled",
-        "cancellation": {"fee": round(fee_cents / 100, 2), "refund": round(refund_cents / 100, 2),
-                         "from_stage": from_stage, "reason": reason},
-    }})
-    doc["status"] = "cancelled"
-    webhooks.record_event(owner, "errand.cancelled", doc, extra={
-        "reason": reason,
-        "fee": round(fee_cents / 100, 2),
-        "refund": round(refund_cents / 100, 2),
-        "from_stage": from_stage,
-    })
-    resp = {"status": "cancelled",
-            "fee": round(fee_cents / 100, 2),
-            "refund": round(refund_cents / 100, 2),
-            "from_stage": from_stage,
-            "reason": reason}
+
+    # Gather the set of stops to operate on — just this errand, or the whole batch.
+    batch_id = doc.get("batch_id")
+    if batch_id:
+        docs = list(db.errands().find({"business_owner_id": owner, "batch_id": batch_id}))
+    else:
+        docs = [doc]
+
+    # Partition into eligible (can cancel now) and skipped (cannot).
+    eligible, skipped = [], []
+    for d in docs:
+        if lifecycle.can_cancel(d["status"]):
+            eligible.append(d)
+        else:
+            skipped.append({
+                "errand_id": d["errand_id"], "status": d["status"],
+                "reason": _CANCEL_BLOCK_MESSAGES.get(d["status"], "Can't cancel at this stage."),
+            })
+
+    partial = bool(body.get("partial"))
+    if skipped and not partial:
+        # All-or-nothing: nothing has been cancelled, bail with a detailed 409.
+        # Single-stop case preserves the legacy one-line error shape for backwards compat.
+        if not batch_id:
+            return error_response("cancellation_not_allowed", skipped[0]["reason"], 409)
+        return error_response("cancellation_not_allowed",
+                              "One or more stops cannot be cancelled. Pass partial=true to cancel the rest.",
+                              409, {"stops": skipped})
+
+    if not eligible:
+        # partial=true but every stop is already terminal; nothing to do.
+        return error_response("cancellation_not_allowed",
+                              "No stops in this booking are still cancellable.", 409,
+                              {"stops": skipped})
+
+    cancelled = [_cancel_one(owner, d, reason) for d in eligible]
+
+    if batch_id:
+        totals = {
+            "fee": round(sum(c["fee"] for c in cancelled), 2),
+            "refund": round(sum(c["refund"] for c in cancelled), 2),
+        }
+        resp = {"status": "cancelled", "batch_id": batch_id, "reason": reason,
+                "cancelled": cancelled, "skipped": skipped, "totals": totals}
+    else:
+        c = cancelled[0]
+        resp = {"status": "cancelled", "fee": c["fee"], "refund": c["refund"],
+                "from_stage": c["from_stage"], "reason": c["reason"]}
     if idem_key:
         idempotency.save(owner, idem_key, idem_fp, resp)
     return Response(resp)

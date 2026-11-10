@@ -212,3 +212,118 @@ class SaiViewTests(TestCase):
         timeline = [{"status": "accepted", "at": when.isoformat()}]
         self.assertGreater(lifecycle.accept_grace_remaining(timeline, when), 0)
         self.assertEqual(lifecycle.accept_grace_remaining(timeline, when + timedelta(seconds=60)), 0)
+
+    # ---------- proof of delivery (POST /v1/errands/{id}/proof) ----------
+
+    def _advance_and_capture_code(self, target):
+        eid = self._create()
+        self._advance_to(eid, target)
+        code = self._track(eid)["delivery_code"]
+        return eid, code
+
+    def test_proof_happy_path_flips_to_delivered(self):
+        eid, code = self._advance_and_capture_code("arrived_dropoff")
+        r = self.client.post(f"/v1/errands/{eid}/proof",
+                             json.dumps({"delivery_code": code, "recipient_name": "Pat Singh"}),
+                             content_type="application/json", **self._h())
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["status"], "delivered")
+        self.assertEqual(r.json()["proof_of_delivery"]["recipient_name"], "Pat Singh")
+        self.assertTrue(r.json()["proof_of_delivery"]["code_verified"])
+        # tracking now surfaces the record
+        self.assertEqual(self._track(eid)["proof_of_delivery"]["recipient_name"], "Pat Singh")
+        # an errand.delivered webhook landed
+        delivered = db.get_db()["webhook_events"].find_one(
+            {"business_owner_id": self.owner, "type": "errand.delivered"})
+        self.assertIsNotNone(delivered)
+
+    def test_proof_rejects_wrong_delivery_code(self):
+        eid, _ = self._advance_and_capture_code("arrived_dropoff")
+        r = self.client.post(f"/v1/errands/{eid}/proof",
+                             json.dumps({"delivery_code": "WRONG1", "recipient_name": "Pat Singh"}),
+                             content_type="application/json", **self._h())
+        self.assertEqual(r.status_code, 422)
+        self.assertEqual(r.json()["error"]["code"], "delivery_code_mismatch")
+
+    def test_proof_rejects_before_dropoff(self):
+        eid = self._create()
+        self._advance_to(eid, "accepted")
+        code = self._track(eid)["delivery_code"]
+        r = self.client.post(f"/v1/errands/{eid}/proof",
+                             json.dumps({"delivery_code": code, "recipient_name": "Pat Singh"}),
+                             content_type="application/json", **self._h())
+        self.assertEqual(r.status_code, 409)
+        self.assertEqual(r.json()["error"]["code"], "proof_not_allowed")
+
+    def test_proof_requires_recipient_name(self):
+        eid, code = self._advance_and_capture_code("arrived_dropoff")
+        r = self.client.post(f"/v1/errands/{eid}/proof",
+                             json.dumps({"delivery_code": code, "recipient_name": ""}),
+                             content_type="application/json", **self._h())
+        self.assertEqual(r.status_code, 400)
+
+    # ---------- multi-stop cancellation (TRD FR-CANCEL-02) ----------
+
+    def _create_batch(self):
+        """Create a 2-drop-off batch booking and return the two errand_ids."""
+        q = self.client.post("/v1/quotes",
+                             json.dumps({"pickup": PICKUP, "stops": [DROP, DROP]}),
+                             content_type="application/json", **self._h())
+        body = {"quote_id": q.json()["quote_id"], "pickup": PICKUP,
+                "dropoffs": [
+                    {"lat": DROP["lat"], "lng": DROP["lng"],
+                     "contact": {"name": "Jordan", "phone_number": "+15195550188"}},
+                    {"lat": DROP["lat"], "lng": DROP["lng"],
+                     "contact": {"name": "Alex", "phone_number": "+15195550199"}},
+                ]}
+        r = self.client.post("/v1/errands", json.dumps(body),
+                             content_type="application/json", **self._h())
+        self.assertEqual(r.status_code, 201)
+        return [stop["errand_id"] for stop in r.json()["stops"]]
+
+    def test_batch_cancel_cancels_every_sibling_atomically(self):
+        ids = self._create_batch()
+        r = self.client.post(f"/v1/errands/{ids[0]}/cancel", **self._h())
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertIn("batch_id", body)
+        self.assertEqual(len(body["cancelled"]), 2)
+        self.assertEqual(body["skipped"], [])
+        # Both sibling errands are now cancelled in the DB.
+        for eid in ids:
+            self.assertEqual(self._track(eid)["status"], "cancelled")
+
+    def test_batch_cancel_all_or_nothing_blocks_when_one_stop_is_picked_up(self):
+        ids = self._create_batch()
+        # Advance the first stop past the point of no return.
+        self._advance_to(ids[0], "picked_up")
+        r = self.client.post(f"/v1/errands/{ids[0]}/cancel", **self._h())
+        self.assertEqual(r.status_code, 409)
+        self.assertEqual(r.json()["error"]["code"], "cancellation_not_allowed")
+        # Nothing was cancelled — the second stop is still in progress.
+        self.assertNotEqual(self._track(ids[1])["status"], "cancelled")
+        # Per-stop reasons are surfaced in the error details.
+        self.assertIn("stops", r.json()["error"]["details"])
+
+    def test_batch_cancel_partial_true_cancels_the_rest_and_skips_locked(self):
+        ids = self._create_batch()
+        self._advance_to(ids[0], "picked_up")
+        r = self.client.post(f"/v1/errands/{ids[0]}/cancel",
+                             json.dumps({"partial": True, "reason": "customer_changed_mind"}),
+                             content_type="application/json", **self._h())
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(len(body["cancelled"]), 1)
+        self.assertEqual(len(body["skipped"]), 1)
+        self.assertEqual(body["skipped"][0]["errand_id"], ids[0])
+        # Stop 0 stays in progress; stop 1 is cancelled.
+        self.assertEqual(self._track(ids[0])["status"], "picked_up")
+        self.assertEqual(self._track(ids[1])["status"], "cancelled")
+
+    def test_proof_persists_optional_note(self):
+        eid, code = self._advance_and_capture_code("arrived_dropoff")
+        body = {"delivery_code": code, "recipient_name": "Pat Singh", "note": "left at front desk"}
+        r = self.client.post(f"/v1/errands/{eid}/proof", json.dumps(body),
+                             content_type="application/json", **self._h())
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["proof_of_delivery"]["note"], "left at front desk")
