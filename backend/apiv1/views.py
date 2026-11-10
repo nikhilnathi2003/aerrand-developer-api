@@ -15,8 +15,12 @@ from rest_framework.response import Response
 
 from . import (
     addresses, audit, db, eta, geocoding, idempotency, keys, lifecycle, pricing,
-    proof, ratelimit, reports, scheduling, statements, wallet, webhooks,
+    progress, proof, ratelimit, reports, scheduling, statements, wallet, webhooks,
 )
+
+# How far from pickup toward drop-off the driver should appear at each stage.
+STAGE_PROGRESS = {"accepted": 0.0, "arrived": 0.05, "picked_up": 0.1, "in_transit": 0.6,
+                  "arrived_dropoff": 0.95, "delivered": 1.0}
 from .authentication import ApiKeyAuthentication, require_scope
 from .errors import error_response
 
@@ -526,18 +530,39 @@ def track_errand(request, errand_id):
         return error_response("errand_not_found", "Errand not found.", 404)
     driver = doc.get("driver")
     eta_min = None
+    eta_at = None
+    distance_remaining_km = None
     if driver and doc["status"] not in ("delivered", "cancelled"):
         eta_min = eta.estimate_minutes(driver, doc["dropoff"])
+        eta_at = (_now() + timedelta(minutes=eta_min)).isoformat()
+        distance_remaining_km = round(pricing.haversine_km(driver, doc["dropoff"]) * 1.3, 2)
+    # Preview whether the business can still cancel and what the fee / refund would be.
+    allowed = lifecycle.can_cancel(doc["status"])
+    base_fee = lifecycle.cancellation_fee_cents(doc["status"], doc["pricing"]["amount_cents"]) if allowed else 0
+    grace_left = lifecycle.accept_grace_remaining(doc.get("timeline", []), _now()) if allowed else 0
+    # Grace window after accept keeps cancellation free.
+    fee_cents = 0 if grace_left > 0 else base_fee
+    paid_cents = doc["pricing"]["amount_cents"] if doc.get("payment", {}).get("status") == "paid" else 0
+    refund_cents = max(0, paid_cents - fee_cents) if allowed else 0
     return Response({
         "errand_id": doc["errand_id"],
         "status": doc["status"],
         "driver": driver,
         "eta_minutes": eta_min,
+        "eta_at": eta_at,
         "pickup": {"lat": float(doc["pickup"]["lat"]), "lng": float(doc["pickup"]["lng"])},
         "dropoff": {"lat": float(doc["dropoff"]["lat"]), "lng": float(doc["dropoff"]["lng"])},
         "timeline": doc.get("timeline", []),
         "delivery_code": doc["delivery_code"],
         "proof_of_delivery": doc.get("proof_of_delivery"),
+        "cancellation": {
+            "allowed": allowed,
+            "fee_cents": fee_cents,
+            "refund_cents": refund_cents,
+            "grace_seconds_remaining": grace_left,
+        },
+        "distance_remaining_km": distance_remaining_km,
+        "cancellation_result": doc.get("cancellation") if doc["status"] == "cancelled" else None,
     })
 
 
@@ -547,6 +572,21 @@ def track_errand(request, errand_id):
 def cancel_errand(request, errand_id):
     require_scope(request, "cancel")
     owner = request.user.business_owner_id
+    body = request.data or {}
+
+    # Idempotency: a flaky client that retries this request must not re-emit
+    # errand.cancelled or double-refund. If we've already handled this key, replay.
+    idem_key = request.META.get("HTTP_IDEMPOTENCY_KEY")
+    idem_fp = idempotency.fingerprint({"errand_id": errand_id, "body": body}) if idem_key else None
+    if idem_key:
+        existing = idempotency.lookup(owner, idem_key)
+        if existing:
+            if existing["fingerprint"] == idem_fp:
+                return Response(existing["response"], status=200,
+                                headers={"Idempotent-Replayed": "true"})
+            return error_response("idempotency_key_reused",
+                                  "This Idempotency-Key was already used with a different request.", 422)
+
     doc = _owned(owner, errand_id)
     if not doc:
         return error_response("errand_not_found", "Errand not found.", 404)
@@ -560,22 +600,38 @@ def cancel_errand(request, errand_id):
         }.get(doc["status"], "Can't cancel at this stage.")
         return error_response("cancellation_not_allowed", msg, 409)
     from_stage = doc["status"]
-    fee_cents = lifecycle.cancellation_fee_cents(from_stage, doc["pricing"]["amount_cents"])
+    base_fee = lifecycle.cancellation_fee_cents(from_stage, doc["pricing"]["amount_cents"])
+    # Grace window after a driver accepts keeps the cancellation free.
+    grace_left = lifecycle.accept_grace_remaining(doc.get("timeline", []), _now())
+    fee_cents = 0 if grace_left > 0 else base_fee
     refund_cents = 0
     if doc["payment"]["status"] == "paid":
         refund_cents = max(0, doc["pricing"]["amount_cents"] - fee_cents)
         wallet.refund(owner, refund_cents, errand_id)  # refund to wallet
+    # Accept a free-form reason from the caller (max 60 chars, trimmed);
+    # default to the TRD's business_request when not provided.
+    raw_reason = (body.get("reason") or "business_request")
+    reason = str(raw_reason).strip()[:60] or "business_request"
     db.errands().update_one({"errand_id": errand_id}, {"$set": {
         "status": "cancelled",
         "cancellation": {"fee": round(fee_cents / 100, 2), "refund": round(refund_cents / 100, 2),
-                         "from_stage": from_stage},
+                         "from_stage": from_stage, "reason": reason},
     }})
     doc["status"] = "cancelled"
-    webhooks.record_event(owner, "errand.cancelled", doc)
-    return Response({"status": "cancelled",
-                     "fee": round(fee_cents / 100, 2),
-                     "refund": round(refund_cents / 100, 2),
-                     "from_stage": from_stage})
+    webhooks.record_event(owner, "errand.cancelled", doc, extra={
+        "reason": reason,
+        "fee": round(fee_cents / 100, 2),
+        "refund": round(refund_cents / 100, 2),
+        "from_stage": from_stage,
+    })
+    resp = {"status": "cancelled",
+            "fee": round(fee_cents / 100, 2),
+            "refund": round(refund_cents / 100, 2),
+            "from_stage": from_stage,
+            "reason": reason}
+    if idem_key:
+        idempotency.save(owner, idem_key, idem_fp, resp)
+    return Response(resp)
 
 
 # --------------------------------------------------------------------------- #
@@ -628,16 +684,13 @@ def advance_errand(request, errand_id):
     nxt = order[order.index(cur) + 1]
     update = {"status": nxt}
     # simulate the driver moving from pickup toward the drop-off
-    progress = {"accepted": 0.0, "arrived": 0.05, "picked_up": 0.1, "in_transit": 0.6,
-                "arrived_dropoff": 0.95, "delivered": 1.0}.get(nxt)
-    if progress is not None:
-        pu, do = doc["pickup"], doc["dropoff"]
-        lat = float(pu["lat"]) + progress * (float(do["lat"]) - float(pu["lat"]))
-        lng = float(pu["lng"]) + progress * (float(do["lng"]) - float(pu["lng"]))
+    frac = STAGE_PROGRESS.get(nxt)
+    if frac is not None:
+        pos = progress.position_at(doc["pickup"], doc["dropoff"], frac)
         driver = doc.get("driver") or {
             "name": "Sam O.", "phone": "+1 519 555 0101", "vehicle": doc["vehicle_type"],
             "plate": "CXYZ 123", "rating": 4.9}
-        update["driver"] = {**driver, "lat": round(lat, 5), "lng": round(lng, 5)}
+        update["driver"] = {**driver, "lat": pos["lat"], "lng": pos["lng"]}
     db.errands().update_one({"errand_id": errand_id}, {
         "$set": update,
         "$push": {"timeline": {"status": nxt, "at": _now().isoformat()}},

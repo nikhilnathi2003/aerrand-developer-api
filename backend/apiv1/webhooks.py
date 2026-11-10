@@ -60,8 +60,12 @@ def _sign(body: str) -> str:
     return f"t={t},v1={sig}"
 
 
-def record_event(owner, event_type, errand):
-    """Build the public event, sign it, and store it (ready for the dispatcher)."""
+def record_event(owner, event_type, errand, extra=None):
+    """Build the public event, sign it, and store it (ready for the dispatcher).
+
+    ``extra`` is merged into the event's ``data`` block (e.g. cancellation reason /
+    fee outcome for ``errand.cancelled`` per TRD FR-CANCEL-04).
+    """
     payload = {
         "id": "evt_" + uuid.uuid4().hex[:16],
         "type": event_type,
@@ -73,6 +77,7 @@ def record_event(owner, event_type, errand):
             "status": errand.get("status"),
             "delivery_code": errand.get("delivery_code"),
             "reference": errand.get("reference"),
+            **(extra or {}),
         },
     }
     body = json.dumps(payload, separators=(",", ":"))
