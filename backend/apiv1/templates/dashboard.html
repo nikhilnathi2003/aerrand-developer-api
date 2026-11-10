@@ -443,7 +443,7 @@ function renderTrack(t){
     '<circle cx="'+dx+'" cy="'+dy+'" r="7" fill="#5202d9"/><text x="'+dx+'" y="'+(dy-12)+'" font-size="11" fill="#5202d9" text-anchor="middle" font-weight="700">DROP-OFF</text>'+driver+'</svg>';
   if(t.driver){const d=t.driver;const clock=t.eta_at?new Date(t.eta_at).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}):'';const dist=t.distance_remaining_km?' · '+t.distance_remaining_km+' km':'';$("driverCard").innerHTML='<div class="avatar">'+d.name[0]+'</div><div style="flex:1"><b>'+d.name+'</b> · ★ '+d.rating+'<br><span class="note" style="margin:0">'+d.vehicle+' · '+d.plate+' · '+(d.phone||'')+'</span></div>'+(t.eta_minutes?'<div style="text-align:right"><b style="font-size:18px;color:var(--violet)">'+t.eta_minutes+' min</b><br><span class="note" style="margin:0">ETA'+(clock?' · '+clock:'')+dist+'</span></div>':'');}
   else $("driverCard").innerHTML='<div class="note" style="margin:0">No driver assigned yet — advance to dispatch.</div>';
-  let meta = kv("Status","<b>"+t.status+"</b>") + kv("Handover code", t.delivery_code);
+  let meta = kv("Status","<b>"+statusLabel(t.status)+"</b>") + kv("Handover code", t.delivery_code);
   if(t.proof_of_delivery){
     const p = t.proof_of_delivery;
     meta += '<div style="margin:12px 0 4px"><span class="chip sm prog">Proof of delivery</span></div>';
@@ -453,7 +453,7 @@ function renderTrack(t){
     if(p.note) meta += kv("Note", p.note);
   }
   $("trackMeta").innerHTML = meta;
-  $("timeline").innerHTML=(t.timeline||[]).map(s=>'<li><b>'+s.status+'</b> · '+s.at.slice(11,19)+' <span class="note" style="margin:0">· '+ago(s.at)+'</span></li>').join("");
+  $("timeline").innerHTML=(t.timeline||[]).map(s=>'<li><b>'+statusLabel(s.status)+'</b> · '+s.at.slice(11,19)+' <span class="note" style="margin:0">· '+ago(s.at)+'</span></li>').join("");
   // Terminal state: hide Advance/Cancel and show a persistent summary card instead.
   const terminal=(t.status==="delivered"||t.status==="cancelled");
   $("trackActions").style.display = terminal ? "none" : "";
@@ -491,7 +491,7 @@ function renderSummary(t){
   }
   const c=t.cancellation_result||{};
   return '<div class="summary-card gone"><h4>✕ Cancelled</h4>'
-    + (c.from_stage?'<div class="kv"><span>Cancelled from</span><b>'+c.from_stage+'</b></div>':'')
+    + (c.from_stage?'<div class="kv"><span>Cancelled from</span><b>'+statusLabel(c.from_stage)+'</b></div>':'')
     + (c.reason?'<div class="kv"><span>Reason</span><b>'+c.reason+'</b></div>':'')
     + ('fee' in c?'<div class="kv"><span>Fee</span><b>'+money(c.fee)+'</b></div>':'')
     + ('refund' in c?'<div class="kv"><span>Refunded to wallet</span><b>'+money(c.refund)+'</b></div>':'')
@@ -531,7 +531,7 @@ function startGraceCountdown(seconds){
 async function advance(){
   const r=await api("/v1/errands/"+ERRAND_ID+"/advance","POST",{});
   if(!r.ok){$("trackMsg").innerHTML=(r.data.error&&r.data.error.message)||"At final stage.";}
-  else{ toast(r.data.status==="delivered"?"Delivered ✓":"Status → "+r.data.status); }
+  else{ toast(r.data.status==="delivered"?"Delivered ✓":"Status → "+statusLabel(r.data.status)); }
   refreshTrack(); loadEvents();
 }
 // Proof-of-delivery modal — handler opens the dialog, posts to /proof, refreshes tracking.
@@ -608,12 +608,20 @@ async function cancelErrand(){
 
 /* deliveries + overview */
 let _allDeliv=[], _delivFilter="all";
+// Friendly label for a raw status slug — purely UI, the API still returns slugs.
+const STATUS_LABELS={
+  pending_payment:"Awaiting payment", pending:"Pending", broadcasted:"Finding a driver",
+  accepted:"Driver accepted", arrived:"Driver at pickup", picked_up:"Picked up",
+  in_transit:"On the way", arrived_dropoff:"At drop-off",
+  delivered:"Delivered", cancelled:"Cancelled",
+};
+function statusLabel(s){ return STATUS_LABELS[s] || s; }
 function statusChip(s){
   const cls = s==="delivered"?"ok-g"
     : s==="cancelled"?"gone"
     : (s==="pending"||s==="pending_payment"||s==="broadcasted")?"warn"
     : "prog";
-  return '<span class="chip '+cls+' sm">'+s+'</span>';
+  return '<span class="chip '+cls+' sm">'+statusLabel(s)+'</span>';
 }
 function filterDeliv(f){
   _delivFilter=f;
