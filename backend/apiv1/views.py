@@ -14,8 +14,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from . import (
-    addresses, audit, db, eta, geocoding, idempotency, keys, lifecycle, pricing,
-    progress, proof, ratelimit, reports, scheduling, statements, wallet, webhooks,
+    addresses, audit, db, eta, geocoding, idempotency, keys, lifecycle, livefeed,
+    pricing, progress, proof, ratelimit, reports, scheduling, statements, wallet, webhooks,
 )
 
 # How far from pickup toward drop-off the driver should appear at each stage.
@@ -767,6 +767,25 @@ def _list_errands(request):
     owner = request.user.business_owner_id
     docs = list(db.errands().find({"business_owner_id": owner}).sort("created_at", -1).limit(20))
     return Response({"errands": [_errand_response(d) for d in docs]})
+
+
+# --------------------------------------------------------------------------- #
+# Live-operations feed (Sai) — GET /v1/livefeed
+# --------------------------------------------------------------------------- #
+@api_view(["GET"])
+@authentication_classes([ApiKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def live_feed(request):
+    """Active deliveries for this business — in-progress only, with progress_percent.
+
+    What a partner's 'live operations' board polls for a quick-glance status. Finished
+    deliveries (delivered / cancelled) drop off; a Deliveries page / history view handles
+    those.
+    """
+    require_scope(request, "read")
+    owner = request.user.business_owner_id
+    rows = livefeed.active(owner)
+    return Response({"active": rows, "count": len(rows)})
 
 
 # --------------------------------------------------------------------------- #
