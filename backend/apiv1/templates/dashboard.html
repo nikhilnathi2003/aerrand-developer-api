@@ -160,6 +160,7 @@
       <section class="page active" id="p-overview">
         <div class="cards">
           <div class="metric"><div class="l">Deliveries</div><div class="v" id="mDeliv">0</div></div>
+          <div class="metric"><div class="l">Active now</div><div class="v" id="mActive" style="color:var(--violet)">0</div></div>
           <div class="metric"><div class="l">Booked (CAD)</div><div class="v" id="mBooked">$0</div></div>
           <div class="metric"><div class="l">Wallet balance</div><div class="v" id="mWallet">—</div></div>
           <div class="metric"><div class="l">Webhook events</div><div class="v" id="mEvents">0</div></div>
@@ -295,8 +296,8 @@ function nav(p){
   $("p-"+p).classList.add("active");
   document.querySelectorAll(".nav a").forEach(a=>a.classList.toggle("active",a.dataset.p===p));
   $("pageTitle").textContent=TITLES[p];
-  if(p==="overview"){loadErrands();loadEvents();}
-  if(p==="deliveries")loadErrands();
+  if(p==="overview"){loadErrands();loadEvents();loadActive();}
+  if(p==="deliveries"){loadErrands();loadActive();}
   if(p==="wallet")loadWallet();
   if(p==="webhooks")loadEvents();
   if(p==="tracking"){ refreshTrack(); startTrackPolling(); } else { stopGraceCountdown(); stopTrackPolling(); }
@@ -339,6 +340,14 @@ async function revokeKey(){
 }
 
 /* wallet (Charan) */
+// Live-operations feed — count of in-progress deliveries for the Overview tile.
+async function loadActive(){
+  if(!API_KEY){ $("mActive").textContent="—"; return; }
+  const r=await api("/v1/livefeed","GET");
+  if(!r.ok) return;
+  $("mActive").textContent = r.data.count;
+}
+
 async function loadWallet(){
   if(!API_KEY){
     $("wBig").textContent="—"; $("wAdded").textContent="—"; $("wSpent").textContent="—";
