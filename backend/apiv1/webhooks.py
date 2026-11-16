@@ -60,6 +60,21 @@ def _sign(body: str) -> str:
     return f"t={t},v1={sig}"
 
 
+def verify_signature(body: str, signature_header: str, secret: str = SIGNING_SECRET) -> bool:
+    """Check a webhook body against its signature header (format: ``t=..,v1=..``).
+
+    A partner receiving our webhook recomputes the HMAC over ``"{t}.{body}"`` with the
+    shared secret and compares it to ``v1``. Uses a constant-time compare so a wrong
+    guess leaks no timing information. Returns False on any malformed header.
+    """
+    parts = dict(p.split("=", 1) for p in signature_header.split(",") if "=" in p)
+    t, v1 = parts.get("t"), parts.get("v1")
+    if not t or not v1:
+        return False
+    expected = hmac.new(secret.encode(), f"{t}.{body}".encode(), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, v1)
+
+
 def record_event(owner, event_type, errand, extra=None):
     """Build the public event, sign it, and store it (ready for the dispatcher).
 
