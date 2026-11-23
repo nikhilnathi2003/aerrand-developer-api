@@ -39,3 +39,7 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Local email credentials (never commit)
+backend/.env.email
+.env.email
