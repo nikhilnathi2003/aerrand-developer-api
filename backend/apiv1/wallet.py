@@ -143,6 +143,25 @@ def _send_low_balance_email(owner_id, to_email, balance):
     msg.send(fail_silently=True)
 
 
+def send_topup_email(owner_id, amount_cents, new_balance_cents):
+    """Email a confirmation whenever the business tops up the wallet."""
+    from django.conf import settings
+    from django.core.mail import EmailMessage
+    to_email = get_email(owner_id)
+    subject = "✅ Your Aerrand wallet was topped up"
+    html = f"""\
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#1a1a1a;max-width:460px">
+  <p>Hi,</p>
+  <p>Your Aerrand wallet was topped up by <b>${amount_cents / 100:.2f}</b>.</p>
+  <p>New balance: <b>${new_balance_cents / 100:.2f}</b>.</p>
+  <p style="color:#888;font-size:12px">— The Aerrand team</p>
+</div>"""
+    from_addr = getattr(settings, "DEFAULT_FROM_EMAIL", "alerts@aerrand.dev")
+    msg = EmailMessage(subject, html, from_addr, [to_email])
+    msg.content_subtype = "html"
+    msg.send(fail_silently=True)
+
+
 def check_low_balance(owner_id):
     """After a charge: if the wallet is now low, email the business.
 

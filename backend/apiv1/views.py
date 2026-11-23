@@ -575,8 +575,10 @@ def wallet_topup(request):
     if amount <= 0 or amount > 100000:
         return error_response("validation_failed", "Invalid amount.", 400,
                               {"amount": "must be between 0 and 100000"})
-    wallet.topup(owner, int(round(amount * 100)))
-    return Response({"currency": "CAD", "balance": round(wallet.get_balance(owner) / 100, 2)})
+    cents = int(round(amount * 100))
+    new_balance = wallet.topup(owner, cents)
+    wallet.send_topup_email(owner, cents, new_balance)  # confirmation email
+    return Response({"currency": "CAD", "balance": round(new_balance / 100, 2)})
 
 
 # --------------------------------------------------------------------------- #
