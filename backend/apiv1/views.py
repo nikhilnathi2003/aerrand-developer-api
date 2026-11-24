@@ -814,7 +814,8 @@ def errand_proof(request, errand_id):
         return error_response("delivery_code_mismatch",
                               "The delivery code does not match this delivery.", 422)
 
-    record = proof.build_record(recipient, body.get("note", ""), code_verified=True)
+    record = proof.build_record(recipient, body.get("note", ""), code_verified=True,
+                                photo=body.get("photo"))
     update = {"proof_of_delivery": record}
     newly_delivered = doc["status"] != "delivered"
     if newly_delivered:
