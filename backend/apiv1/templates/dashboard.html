@@ -177,6 +177,12 @@
           <label>Business name</label><input id="business" value="Acme Co">
           <button id="btnKey" onclick="genKey()">Generate test key</button>
           <div class="result" id="keyOut"></div></div>
+        <div class="card"><h3>Saved addresses</h3><p class="d">Save places you use often (a warehouse, a store). We look up the coordinates once, and you can pick them by name for pickup or drop-off below.</p>
+          <label>Label</label><input id="addrLabel" placeholder="e.g. Warehouse">
+          <label>Address</label><input id="addrQuery" placeholder="e.g. 401 Sunset Ave, Windsor, ON">
+          <button id="btnAddr" onclick="saveAddress()" disabled>Save address</button>
+          <div id="addrMsg" class="note">Generate a test key first.</div>
+          <div id="addrList"></div></div>
         <div class="card"><h3>2 · Price a route</h3><p class="d">The server computes the price from distance, stops, parcel sizes and tax. The caller can never send a price.</p>
           <label>Pickup location</label>
           <input id="puSel" list="places" value="Downtown Windsor" placeholder="Type an address or place in Windsor">
@@ -323,7 +329,7 @@ async function genKey(){
     '<div style="display:flex;gap:8px;align-items:center;margin-top:9px"><div class="mono" style="flex:1">'+r.data.key+'</div><button class="copy" onclick="copy(\''+r.data.key+'\')">Copy</button></div>'+
     '<div class="note">Scopes: '+r.data.scopes.join(", ")+'. Stored only as a hash.</div>'+
     '<button class="ghost sm" onclick="rotateKey()">Rotate</button><button class="ghost sm" onclick="revokeKey()">Revoke</button><div id="keyMsg" class="note"></div>');
-  $("btnQuote").disabled=false; loadWallet(); toast("API key created");
+  $("btnQuote").disabled=false; loadWallet(); loadAddresses(); toast("API key created");
 }
 async function rotateKey(){
   const r=await api("/v1/keys/rotate","POST",{prefix:KEY_PREFIX}); if(!r.ok)return;
@@ -375,7 +381,43 @@ async function topup(amount){
 }
 
 /* pricing (Sujith) */
-async function geocodeAddr(q){ const r=await api("/v1/geocode","POST",{query:q}); return r.ok?r.data:null; }
+/* saved addresses (Sujith) */
+let SAVED_ADDRS=[];
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function loadAddresses(){
+  if(!API_KEY) return;
+  $("btnAddr").disabled=false;
+  const r=await api("/v1/addresses","GET");
+  if(!r.ok) return fail($("addrMsg"),"Couldn't load saved addresses (error "+r.status+").");
+  SAVED_ADDRS=r.data.addresses||[];
+  renderAddresses();
+}
+function renderAddresses(){
+  $("addrMsg").textContent=SAVED_ADDRS.length?"":"No saved addresses yet.";
+  $("addrList").innerHTML=SAVED_ADDRS.length?'<table><thead><tr><th>Label</th><th>Address</th><th></th></tr></thead><tbody>'+
+    SAVED_ADDRS.map((a,i)=>'<tr><td><b>'+esc(a.label)+'</b></td><td>'+esc(a.address)+'</td><td style="text-align:right;white-space:nowrap">'+
+      '<button class="ghost sm" onclick="useAddress('+i+',\'puSel\')">Pickup</button>'+
+      '<button class="ghost sm" onclick="useAddress('+i+',\'doSel\')">Drop-off</button></td></tr>').join("")+'</tbody></table>':"";
+  // offer saved labels as suggestions in the pickup / drop-off fields
+  document.querySelectorAll("#places option[data-saved]").forEach(o=>o.remove());
+  SAVED_ADDRS.forEach(a=>{const o=document.createElement("option");o.value=a.label;o.dataset.saved="1";o.textContent=a.address;$("places").prepend(o);});
+}
+function useAddress(i,field){ $(field).value=SAVED_ADDRS[i].label; toast((field==="puSel"?"Pickup":"Drop-off")+" set to "+SAVED_ADDRS[i].label); }
+async function saveAddress(){
+  const label=$("addrLabel").value.trim(), address=$("addrQuery").value.trim();
+  if(!address) return fail($("addrMsg"),"Type an address to save.");
+  $("btnAddr").disabled=true; $("addrMsg").textContent="Looking up the address…";
+  const r=await api("/v1/addresses","POST",{label,address});
+  $("btnAddr").disabled=false;
+  if(!r.ok) return fail($("addrMsg"),(r.data.error&&r.data.error.message)||("Error "+r.status));
+  $("addrLabel").value=""; $("addrQuery").value="";
+  SAVED_ADDRS.unshift(r.data); renderAddresses(); toast("Saved "+r.data.label);
+}
+async function geocodeAddr(q){
+  const saved=SAVED_ADDRS.find(a=>a.label.toLowerCase()===String(q).trim().toLowerCase());
+  if(saved) return {lat:saved.lat,lng:saved.lng};
+  const r=await api("/v1/geocode","POST",{query:q}); return r.ok?r.data:null;
+}
 async function getQuote(){
   show($("quoteOut"),'<span class="note">Looking up the addresses…</span>');
   const pu=await geocodeAddr($("puSel").value);
