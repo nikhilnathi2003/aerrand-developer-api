@@ -16,7 +16,7 @@ LOW_BALANCE_CENTS = 2000  # $20.00
 # When a charge drops the wallet below the low line we email the business; new
 # deliveries stay blocked until they top up manually (no auto-reload).
 # Where low-balance alerts go if a business hasn't set its own address.
-DEFAULT_ALERT_EMAIL = "nathinikhil28@gmail.com"
+DEFAULT_ALERT_EMAIL = "charansaid2004@gmail.com"
 # The low-balance email offers a one-click top-up of this amount.
 TOPUP_OFFER_CENTS = 5000  # $50.00
 # Base URL used to build the Yes/No top-up links in the email (local demo).
