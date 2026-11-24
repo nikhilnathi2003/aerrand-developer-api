@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>aerrand · Developer Portal</title>
@@ -75,7 +77,18 @@
   .m{font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:700;border-radius:5px;padding:2px 7px}.m.post{background:var(--lilac-bg);color:var(--violet-d)}.m.get{background:#eef6ee;color:var(--ok)}
 
   /* map */
-  .mapwrap{background:#f3f2f8;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .mapwrap{background:#f3f2f8;border:1px solid var(--line);border-radius:12px;overflow:hidden;height:320px}
+  /* Leaflet marker visuals — match the portal's violet look and animate the driver dot smoothly. */
+  .leaflet-container{background:#f3f2f8;font-family:inherit}
+  .leaflet-control-attribution{font-size:10px;background:rgba(255,255,255,.75)}
+  .pin{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+  .pin-pu{width:18px;height:18px;background:#fff;color:#6b6b6b;border-color:#6b6b6b}
+  .pin-do{width:18px;height:18px;background:var(--violet);color:#fff}
+  .pin-dr{width:16px;height:16px;background:var(--violet);color:#fff;position:relative}
+  .pin-dr::before{content:"";position:absolute;inset:-6px;border-radius:50%;background:rgba(82,2,217,.25);animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:scale(.7);opacity:.6}50%{transform:scale(1.15);opacity:.15}}
+  /* Smooth transition when the driver marker's lat/lng changes between stages. */
+  .leaflet-marker-icon.marker-driver{transition:transform .8s ease-in-out}
   .driver-card{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;margin-top:14px}
   .avatar{width:42px;height:42px;border-radius:50%;background:var(--lilac-bg);color:var(--violet-d);display:flex;align-items:center;justify-content:center;font-weight:800}
   .tl{list-style:none;padding:0;margin:10px 0 0}
@@ -92,9 +105,19 @@
   pre .k{color:#c3a6ff}.s{color:#9ae6b4}.c{color:#6b6b80}
   #toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;font-size:13.5px;font-weight:600;opacity:0;transform:translateY(12px);transition:all .25s;z-index:100;box-shadow:0 10px 30px rgba(0,0,0,.2);pointer-events:none}
   #toast.show{opacity:1;transform:translateY(0)}
-  .modal-bg{position:fixed;inset:0;background:rgba(10,10,12,.45);display:none;align-items:center;justify-content:center;z-index:200}
-  .modal-bg.show{display:flex}
-  .modal{background:var(--card);border-radius:14px;padding:22px 24px;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  /* Draggable floating window: a light backdrop that lets clicks pass through to the page
+     behind, and a modal that's absolutely positioned and can be dragged by its header. */
+  .modal-bg{position:fixed;inset:0;background:rgba(10,10,12,.18);display:none;z-index:200;pointer-events:none}
+  .modal-bg.show{display:block}
+  .modal{box-sizing:border-box;background:var(--card);border-radius:14px;padding:0;max-width:400px;width:90vw;position:absolute;top:60px;right:28px;box-shadow:0 20px 60px rgba(0,0,0,.3);pointer-events:auto;overflow:hidden}
+  .modal-handle{cursor:grab;user-select:none;display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:#fafafb;border-radius:14px 14px 0 0}
+  .modal-handle:active{cursor:grabbing}
+  .modal-handle .grip{color:var(--muted);font-size:14px;letter-spacing:-2px;line-height:1}
+  .modal-handle .title{flex:1;font-size:13px;font-weight:700;color:var(--ink-2)}
+  .modal-close{background:none;border:none;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;padding:0 4px}
+  .modal-close:hover{color:var(--ink)}
+  .modal-body{padding:18px 22px 20px}
+  .modal-body h4{margin-top:0}
   .modal h4{margin:0 0 6px;font-size:16px}
   .modal .note{margin:0 0 14px}
   .reason-opt{display:block;width:100%;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);font-size:13.5px;font-weight:600;margin-bottom:6px;cursor:pointer}
@@ -306,7 +329,7 @@ function nav(p){
   if(p==="deliveries"){loadErrands();loadActive();}
   if(p==="wallet")loadWallet();
   if(p==="webhooks")loadEvents();
-  if(p==="tracking"){ refreshTrack(); startTrackPolling(); } else { stopGraceCountdown(); stopTrackPolling(); }
+  if(p==="tracking"){ refreshTrack(); startTrackPolling(); } else { stopGraceCountdown(); stopTrackPolling(); _resetLeafletMap(); }
 }
 
 async function api(path,method,body,extra){
@@ -465,33 +488,49 @@ async function refreshTrack(){
   $("trackEmpty").style.display="none"; $("trackView").style.display="grid";
   renderTrack(r.data);
 }
-function project(p,box){const W=520,H=300,pad=34;
-  const x=pad+(p.lng-box.minLng)/((box.maxLng-box.minLng)||1)*(W-2*pad);
-  const y=pad+(box.maxLat-p.lat)/((box.maxLat-box.minLat)||1)*(H-2*pad);return [x.toFixed(1),y.toFixed(1)];}
+// --- Leaflet live map ---
+// One Leaflet map per tracking view, created on first render and reused across refreshes
+// so the driver marker can CSS-transition between stages instead of being redrawn.
+let _lfMap=null, _lfErrandId=null, _lfPickup=null, _lfDropoff=null, _lfDriver=null, _lfRoute=null;
+function _resetLeafletMap(){
+  if(_lfMap){ try{ _lfMap.remove(); }catch(e){} }
+  _lfMap=_lfErrandId=_lfPickup=_lfDropoff=_lfDriver=_lfRoute=null;
+}
+function _renderMap(t){
+  // If Leaflet hasn't loaded yet (slow first page load), retry when it has.
+  if(typeof L==="undefined"){ setTimeout(()=>_renderMap(t), 200); return; }
+  const pu=[parseFloat(t.pickup.lat), parseFloat(t.pickup.lng)];
+  const dof=[parseFloat(t.dropoff.lat), parseFloat(t.dropoff.lng)];
+  // Fresh map on first render for this errand (or after switching deliveries).
+  if(!_lfMap || _lfErrandId !== t.errand_id){
+    _resetLeafletMap();
+    _lfMap = L.map("mapBox", {zoomControl:true, attributionControl:true, scrollWheelZoom:false});
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(_lfMap);
+    _lfPickup  = L.marker(pu,  {icon: L.divIcon({className:"", html:'<div class="pin pin-pu">P</div>', iconSize:[18,18], iconAnchor:[9,9]})}).addTo(_lfMap).bindTooltip("Pickup",{direction:"top", offset:[0,-10]});
+    _lfDropoff = L.marker(dof, {icon: L.divIcon({className:"", html:'<div class="pin pin-do">D</div>', iconSize:[18,18], iconAnchor:[9,9]})}).addTo(_lfMap).bindTooltip("Drop-off",{direction:"top", offset:[0,-10]});
+    _lfRoute = L.polyline([pu, dof], {color:"#5202d9", weight:3, opacity:.75, dashArray:"6 5"}).addTo(_lfMap);
+    _lfMap.fitBounds(_lfRoute.getBounds(), {padding:[30,30]});
+    _lfErrandId = t.errand_id;
+    // Leaflet needs a size recalc when its container was display:none at init time.
+    setTimeout(()=>{ if(_lfMap) _lfMap.invalidateSize(); }, 50);
+  }
+  // Driver marker: create or move. CSS transition on .marker-driver glides it smoothly.
+  if(t.driver){
+    const pos = [parseFloat(t.driver.lat), parseFloat(t.driver.lng)];
+    if(!_lfDriver){
+      _lfDriver = L.marker(pos, {icon: L.divIcon({className:"marker-driver", html:'<div class="pin pin-dr"></div>', iconSize:[16,16], iconAnchor:[8,8]})}).addTo(_lfMap).bindTooltip(t.driver.name, {direction:"top", offset:[0,-8]});
+    } else {
+      _lfDriver.setLatLng(pos);
+    }
+  } else if(_lfDriver){
+    _lfMap.removeLayer(_lfDriver); _lfDriver=null;
+  }
+}
 function renderTrack(t){
-  const pts=[t.pickup,t.dropoff]; if(t.driver)pts.push({lat:t.driver.lat,lng:t.driver.lng});
-  const lats=pts.map(p=>p.lat),lngs=pts.map(p=>p.lng);
-  const dlat=(Math.max(...lats)-Math.min(...lats))||0.01, dlng=(Math.max(...lngs)-Math.min(...lngs))||0.01;
-  const box={minLat:Math.min(...lats)-dlat*.35,maxLat:Math.max(...lats)+dlat*.35,minLng:Math.min(...lngs)-dlng*.35,maxLng:Math.max(...lngs)+dlng*.35};
-  const [px,py]=project(t.pickup,box),[dx,dy]=project(t.dropoff,box);
-  let grid=''; for(let i=1;i<8;i++){grid+='<line x1="'+(i*65)+'" y1="0" x2="'+(i*65)+'" y2="300" stroke="#e4e2ee"/>';}
-  for(let i=1;i<5;i++){grid+='<line x1="0" y1="'+(i*60)+'" x2="520" y2="'+(i*60)+'" stroke="#e4e2ee"/>';}
-  let driver=''; if(t.driver){const [vx,vy]=project({lat:t.driver.lat,lng:t.driver.lng},box);
-    // Smoothly animate the driver dot from its previous position (if any) to the new one.
-    const fx = (_lastDriver && _lastDriver.id===t.errand_id) ? _lastDriver.x : vx;
-    const fy = (_lastDriver && _lastDriver.id===t.errand_id) ? _lastDriver.y : vy;
-    const anim = (fx!==vx || fy!==vy)
-      ? '<animate attributeName="cx" from="'+fx+'" to="'+vx+'" dur="0.8s" fill="freeze"/>'
-       +'<animate attributeName="cy" from="'+fy+'" to="'+vy+'" dur="0.8s" fill="freeze"/>'
-      : '';
-    driver='<circle cx="'+vx+'" cy="'+vy+'" r="12" fill="#5202d9" opacity=".25"><animate attributeName="r" values="12;20;12" dur="1.6s" repeatCount="indefinite"/>'+anim+'</circle>'
-          +'<circle cx="'+vx+'" cy="'+vy+'" r="7" fill="#5202d9" stroke="#fff" stroke-width="2">'+anim+'</circle>';
-    _lastDriver={id:t.errand_id, x:vx, y:vy};
-  } else { _lastDriver=null; }
-  $("mapBox").innerHTML='<svg viewBox="0 0 520 300" width="100%">'+grid+
-    '<line x1="'+px+'" y1="'+py+'" x2="'+dx+'" y2="'+dy+'" stroke="#5202d9" stroke-width="2.5" stroke-dasharray="6 5"/>'+
-    '<circle cx="'+px+'" cy="'+py+'" r="7" fill="#fff" stroke="#6b6b6b" stroke-width="3"/><text x="'+px+'" y="'+(py-12)+'" font-size="11" fill="#6b6b6b" text-anchor="middle" font-weight="700">PICKUP</text>'+
-    '<circle cx="'+dx+'" cy="'+dy+'" r="7" fill="#5202d9"/><text x="'+dx+'" y="'+(dy-12)+'" font-size="11" fill="#5202d9" text-anchor="middle" font-weight="700">DROP-OFF</text>'+driver+'</svg>';
+  _renderMap(t);
   if(t.driver){const d=t.driver;const clock=t.eta_at?new Date(t.eta_at).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}):'';const dist=t.distance_remaining_km?' · '+t.distance_remaining_km+' km':'';$("driverCard").innerHTML='<div class="avatar">'+d.name[0]+'</div><div style="flex:1"><b>'+d.name+'</b> · ★ '+d.rating+'<br><span class="note" style="margin:0">'+d.vehicle+' · '+d.plate+' · '+(d.phone||'')+'</span></div>'+(t.eta_minutes?'<div style="text-align:right"><b style="font-size:18px;color:var(--violet)">'+t.eta_minutes+' min</b><br><span class="note" style="margin:0">ETA'+(clock?' · '+clock:'')+dist+'</span></div>':'');}
   else $("driverCard").innerHTML='<div class="note" style="margin:0">No driver assigned yet — advance to dispatch.</div>';
   let meta = kv("Status","<b>"+statusLabel(t.status)+"</b>") + kv("Handover code", t.delivery_code);
@@ -502,6 +541,7 @@ function renderTrack(t){
     meta += kv("Code verified", p.code_verified ? "✓ yes" : "✗ no");
     meta += kv("Confirmed", new Date(p.confirmed_at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'}));
     if(p.note) meta += kv("Note", p.note);
+    if(p.photo) meta += '<div style="margin-top:8px"><img src="'+p.photo+'" alt="Drop-off photo" style="max-width:100%;max-height:200px;border-radius:9px;border:1px solid var(--line)"></div>';
   }
   $("trackMeta").innerHTML = meta;
   $("timeline").innerHTML=(t.timeline||[]).map(s=>'<li><b>'+statusLabel(s.status)+'</b> · '+s.at.slice(11,19)+' <span class="note" style="margin:0">· '+ago(s.at)+'</span></li>').join("");
@@ -585,14 +625,107 @@ async function advance(){
   else{ toast(r.data.status==="delivered"?"Delivered ✓":"Status → "+statusLabel(r.data.status)); }
   refreshTrack(); loadEvents();
 }
+// Make a floating modal draggable by its header handle (mouse + touch).
+// Works for both the proof and reason modals.
+function _enableDragFor(modalBgId){
+  const bg = $(modalBgId); if(!bg) return;
+  const modal = bg.querySelector(".modal");
+  const handle = bg.querySelector(".modal-handle");
+  if(!modal || !handle) return;
+  let startX, startY, startL, startT, dragging = false;
+  const point = e => e.touches ? e.touches[0] : e;
+  function onDown(e){
+    if(e.target.closest(".modal-close")) return; // clicks on the × aren't drags
+    dragging = true;
+    const p = point(e);
+    const rect = modal.getBoundingClientRect();
+    startX = p.clientX; startY = p.clientY;
+    startL = rect.left; startT = rect.top;
+    // Switch from right-anchored to left/top-anchored once dragging starts.
+    modal.style.right = "auto";
+    modal.style.left = startL + "px";
+    modal.style.top = startT + "px";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.addEventListener("touchmove", onMove, {passive:false});
+    document.addEventListener("touchend", onUp);
+    e.preventDefault();
+  }
+  function onMove(e){
+    if(!dragging) return;
+    const p = point(e);
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const rect = modal.getBoundingClientRect();
+    // Keep at least 60px of the modal on-screen so it can't be dragged away.
+    let nl = Math.max(-rect.width + 60, Math.min(vw - 60, startL + (p.clientX - startX)));
+    let nt = Math.max(0, Math.min(vh - 40, startT + (p.clientY - startY)));
+    modal.style.left = nl + "px";
+    modal.style.top = nt + "px";
+    e.preventDefault();
+  }
+  function onUp(){
+    dragging = false;
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    document.removeEventListener("touchmove", onMove);
+    document.removeEventListener("touchend", onUp);
+  }
+  handle.addEventListener("mousedown", onDown);
+  handle.addEventListener("touchstart", onDown, {passive:false});
+}
+// Enable dragging once the DOM is ready.
+document.addEventListener("DOMContentLoaded", () => {
+  _enableDragFor("proofModal");
+  _enableDragFor("reasonModal");
+  $("proofHeaderClose").onclick = () => $("proofModal").classList.remove("show");
+  $("reasonHeaderClose").onclick = () => $("reasonModal").classList.remove("show");
+});
+
+// Resize an image file to <=800px wide and return a JPEG data URL (~50-150 KB typical).
+// Keeps storage sane for the in-memory demo; in production we'd upload to S3 and store the URL.
+function _photoToDataUrl(file){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 800;
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.8));
+    };
+    img.onerror = reject;
+    const reader = new FileReader();
+    reader.onload = e => { img.src = e.target.result; };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 // Proof-of-delivery modal — handler opens the dialog, posts to /proof, refreshes tracking.
 async function openProof(){
   // Pre-fill the code field with the delivery's handover code so the sender can just paste over it.
   const t=await api("/v1/errands/"+ERRAND_ID+"/tracking","GET");
   const m=$("proofModal");
   $("proofCode").value=""; $("proofRecipient").value=""; $("proofNote").value="";
+  $("proofPhoto").value=""; $("proofPhotoPreview").style.display="none"; $("proofPhotoPreview").src="";
+  let photoDataUrl = null;
   if(t.ok && t.data.delivery_code) $("proofCode").placeholder="e.g. "+t.data.delivery_code;
-  const close=()=>{ m.classList.remove("show"); $("proofCancel").onclick=null; $("proofSubmit").onclick=null; };
+  // When a file is picked, downscale it and show a preview inside the modal.
+  $("proofPhoto").onchange = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file){ photoDataUrl = null; $("proofPhotoPreview").style.display="none"; return; }
+    try {
+      photoDataUrl = await _photoToDataUrl(file);
+      $("proofPhotoPreview").src = photoDataUrl;
+      $("proofPhotoPreview").style.display = "block";
+    } catch (err) {
+      toast("Couldn't read that image.");
+      photoDataUrl = null;
+    }
+  };
+  const close=()=>{ m.classList.remove("show"); $("proofCancel").onclick=null; $("proofSubmit").onclick=null; $("proofPhoto").onchange=null; };
   $("proofCancel").onclick=close;
   $("proofSubmit").onclick=async()=>{
     const body={
@@ -600,6 +733,7 @@ async function openProof(){
       recipient_name: $("proofRecipient").value.trim(),
       note: $("proofNote").value.trim(),
     };
+    if(photoDataUrl) body.photo = photoDataUrl;
     if(!body.delivery_code){ toast("Delivery code is required."); return; }
     if(!body.recipient_name){ toast("Recipient name is required."); return; }
     const r=await api("/v1/errands/"+ERRAND_ID+"/proof","POST",body);
@@ -613,6 +747,7 @@ async function openProof(){
     refreshTrack(); loadEvents();
   };
   m.classList.add("show");
+  m.scrollTop = 0;
   $("proofCode").focus();
 }
 
@@ -630,7 +765,7 @@ function pickReason(summary){
     m.querySelectorAll(".reason-opt").forEach(b=>{ b.onclick=()=>close(b.dataset.r); });
     $("reasonCancel").onclick=()=>close(undefined);  // undefined = user backed out
     $("reasonSubmit").onclick=()=>close(other.value.trim()||null);
-    m.classList.add("show"); other.focus();
+    m.classList.add("show"); m.scrollTop = 0; other.focus();
   });
 }
 async function cancelErrand(){
@@ -717,7 +852,7 @@ async function loadErrands(){
   $("ovDeliv").innerHTML=_allDeliv.length?_allDeliv.slice(0,5).map(ovRow).join(""):'<tr><td colspan="3" class="empty">Nothing yet.</td></tr>';
   renderDeliveries();
 }
-function track(id){ if(id!==ERRAND_ID){ $("trackMsg").innerHTML=""; stopGraceCountdown(); } ERRAND_ID=id; nav("tracking"); }
+function track(id){ if(id!==ERRAND_ID){ $("trackMsg").innerHTML=""; stopGraceCountdown(); _resetLeafletMap(); } ERRAND_ID=id; nav("tracking"); }
 
 /* webhooks (team) */
 async function loadEvents(){
@@ -742,35 +877,50 @@ async function registerWebhook(){
 
 <div class="modal-bg" id="proofModal">
   <div class="modal">
-    <h4>Confirm delivery</h4>
-    <p class="note">Enter the delivery code the sender was given and who received the parcel.</p>
-    <label>Delivery code</label>
-    <input id="proofCode" type="text" maxlength="16" placeholder="e.g. L3SLRN">
-    <label style="margin-top:8px;display:block">Recipient name</label>
-    <input id="proofRecipient" type="text" maxlength="60" placeholder="e.g. Pat Singh">
-    <label style="margin-top:8px;display:block">Note (optional)</label>
-    <input id="proofNote" type="text" maxlength="120" placeholder="e.g. left at front desk">
-    <div class="modal-row">
-      <button class="ghost sm" id="proofCancel">Back</button>
-      <button class="sm" id="proofSubmit">Confirm delivery</button>
+    <div class="modal-handle" data-drag="proofModal">
+      <span class="grip">⋮⋮</span><span class="title">Confirm delivery</span>
+      <button class="modal-close" id="proofHeaderClose" title="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <h4>Confirm delivery</h4>
+      <p class="note">Enter the delivery code the sender was given and who received the parcel.</p>
+      <label>Delivery code</label>
+      <input id="proofCode" type="text" maxlength="16" placeholder="e.g. L3SLRN">
+      <label style="margin-top:8px;display:block">Recipient name</label>
+      <input id="proofRecipient" type="text" maxlength="60" placeholder="e.g. Pat Singh">
+      <label style="margin-top:8px;display:block">Note (optional)</label>
+      <input id="proofNote" type="text" maxlength="120" placeholder="e.g. left at front desk">
+      <label style="margin-top:8px;display:block">Drop-off photo (optional)</label>
+      <input id="proofPhoto" type="file" accept="image/*" capture="environment" style="padding:6px 0">
+      <img id="proofPhotoPreview" alt="" style="display:none;margin-top:8px;max-width:100%;max-height:160px;border-radius:9px;border:1px solid var(--line)">
+      <div class="modal-row">
+        <button class="ghost sm" id="proofCancel">Back</button>
+        <button class="sm" id="proofSubmit">Confirm delivery</button>
+      </div>
     </div>
   </div>
 </div>
 
 <div class="modal-bg" id="reasonModal">
   <div class="modal">
-    <h4>Why are you cancelling?</h4>
-    <p class="note">Pick a reason, or write your own. Helps us improve the service.</p>
-    <button class="reason-opt" data-r="customer_changed_mind">Customer changed their mind</button>
-    <button class="reason-opt" data-r="wrong_address">Wrong address or recipient info</button>
-    <button class="reason-opt" data-r="package_not_ready">Package isn't ready yet</button>
-    <button class="reason-opt" data-r="driver_too_slow">Driver taking too long</button>
-    <button class="reason-opt" data-r="no_longer_needed">No longer needed</button>
-    <label style="margin-top:8px;display:block">Something else (optional)</label>
-    <input id="reasonOther" type="text" maxlength="60" placeholder="Type your own reason…">
-    <div class="modal-row">
-      <button class="ghost sm" id="reasonCancel">Keep delivery</button>
-      <button class="sm" id="reasonSubmit">Cancel with this reason</button>
+    <div class="modal-handle" data-drag="reasonModal">
+      <span class="grip">⋮⋮</span><span class="title">Cancel delivery</span>
+      <button class="modal-close" id="reasonHeaderClose" title="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <h4>Why are you cancelling?</h4>
+      <p class="note">Pick a reason, or write your own. Helps us improve the service.</p>
+      <button class="reason-opt" data-r="customer_changed_mind">Customer changed their mind</button>
+      <button class="reason-opt" data-r="wrong_address">Wrong address or recipient info</button>
+      <button class="reason-opt" data-r="package_not_ready">Package isn't ready yet</button>
+      <button class="reason-opt" data-r="driver_too_slow">Driver taking too long</button>
+      <button class="reason-opt" data-r="no_longer_needed">No longer needed</button>
+      <label style="margin-top:8px;display:block">Something else (optional)</label>
+      <input id="reasonOther" type="text" maxlength="60" placeholder="Type your own reason…">
+      <div class="modal-row">
+        <button class="ghost sm" id="reasonCancel">Keep delivery</button>
+        <button class="sm" id="reasonSubmit">Cancel with this reason</button>
+      </div>
     </div>
   </div>
 </div>
