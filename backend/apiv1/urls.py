@@ -26,11 +26,12 @@ urlpatterns = [
     path("wallet/confirm-topup", views.confirm_topup, name="wallet-confirm-topup"),
     path("wallet/statement.csv", views.wallet_statement_csv, name="wallet-statement"),
 
-    # tracking + cancel + proof of delivery (Sai)
+    # tracking + cancel + proof of delivery + live feed (Sai)
     path("errands/<str:errand_id>/tracking", views.track_errand, name="track-errand"),
     path("errands/<str:errand_id>/cancel", views.cancel_errand, name="cancel-errand"),
     path("errands/<str:errand_id>/advance", views.advance_errand, name="advance-errand"),
     path("errands/<str:errand_id>/proof", views.errand_proof, name="errand-proof"),
+    path("livefeed", views.live_feed, name="live-feed"),
 
     # webhooks + delivery log (team)
     path("webhooks", views.webhooks_collection, name="webhooks"),

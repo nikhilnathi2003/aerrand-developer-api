@@ -15,11 +15,19 @@ def verify_code(expected, provided):
     return str(provided).strip().upper() == str(expected).strip().upper()
 
 
-def build_record(recipient_name, note="", code_verified=True):
-    """Shape the proof-of-delivery record stored on the errand."""
-    return {
+def build_record(recipient_name, note="", code_verified=True, photo=None):
+    """Shape the proof-of-delivery record stored on the errand.
+
+    ``photo`` is an optional drop-off snapshot. In production this would be a signed
+    S3 URL; for the in-memory demo we accept a browser-generated ``data:image/...``
+    URL (the portal downscales before sending). Stored verbatim on the record.
+    """
+    record = {
         "recipient_name": (recipient_name or "").strip(),
         "note": (note or "").strip(),
         "code_verified": bool(code_verified),
         "confirmed_at": datetime.now(timezone.utc).isoformat(),
     }
+    if photo:
+        record["photo"] = str(photo)
+    return record

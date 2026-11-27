@@ -34,9 +34,15 @@ def geocode(query):
         if name in key:
             return {"lat": lat, "lng": lng, "label": q}
     # fall back to OpenStreetMap Nominatim (free, no API key).
-    # Try with Windsor context first, then the raw query, so house addresses resolve too.
-    full = q if "windsor" in key else q + ", Windsor, Ontario"
-    for search in (full, q):
+    # Look up the address as typed first: the viewbox softly biases ambiguous local
+    # addresses toward Windsor, but a clear far-away place (Toronto, New York) resolves
+    # to its REAL location — so it correctly lands outside our Windsor service area.
+    # Only if that finds nothing do we retry with explicit Windsor context, to help a
+    # bare house/street number resolve.
+    attempts = [q]
+    if "windsor" not in key:
+        attempts.append(q + ", Windsor, Ontario")
+    for search in attempts:
         hit = _nominatim(search)
         if hit:
             return {**hit, "label": q}
@@ -47,7 +53,7 @@ def _nominatim(q):
     try:
         params = urllib.parse.urlencode({
             "q": q, "format": "json", "limit": "1",
-            "countrycodes": "ca",
+            "countrycodes": "ca,us",   # Canada + US, so far cities like New York resolve
             "viewbox": _VIEWBOX,   # bias toward Windsor (not a hard boundary)
         })
         url = "https://nominatim.openstreetmap.org/search?" + params
