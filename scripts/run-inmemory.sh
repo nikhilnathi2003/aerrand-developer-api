@@ -9,6 +9,20 @@ export DJANGO_SETTINGS_MODULE=config.settings
 export API_KEY_HASH_PEPPER=dev-pepper-local
 export INMEMORY_DB=1
 
+# Optional: load Gmail credentials for real low-balance emails (git-ignored, private).
+# Create backend/.env.email with EMAIL_HOST_USER and EMAIL_HOST_PASSWORD to enable.
+if [ -f .env.email ]; then
+  while IFS='=' read -r _k _v || [ -n "$_k" ]; do
+    case "$_k" in ''|\#*) continue;; esac
+    _v="${_v// /}"       # App Passwords are shown with spaces — strip them
+    _v="${_v%$'\r'}"     # strip trailing CR if the file was edited on Windows
+    export "$_k=$_v"
+  done < .env.email
+  echo "  ✉  Real emails ON — sending from: $EMAIL_HOST_USER"
+else
+  echo "  ✉  Email: log-only (no backend/.env.email found)"
+fi
+
 if [ ! -d .venv ]; then
   echo "Creating Python environment (first run only)…"
   python3 -m venv .venv

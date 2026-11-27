@@ -283,6 +283,14 @@ def _create_errand(request):
     payment_method = (body.get("payment") or {}).get("method", "wallet")
     paid = False
     if payment_method == "wallet":
+        # low-balance guard: once the wallet is low, block new bookings until a top-up
+        if wallet.get_balance(owner) < wallet.LOW_BALANCE_CENTS:
+            available = round(wallet.get_balance(owner) / 100, 2)
+            return error_response(
+                "balance_low",
+                "Wallet balance is low — please top up before creating a new delivery.", 402,
+                {"balance": available, "threshold": round(wallet.LOW_BALANCE_CENTS / 100, 2),
+                 "currency": "CAD", "topup_url": "/v1/wallet/topup"})
         if not wallet.debit(owner, breakdown["amount_cents"]):
             available = round(wallet.get_balance(owner) / 100, 2)
             return error_response(
@@ -291,6 +299,8 @@ def _create_errand(request):
                 {"required": charge_total, "available": available, "currency": "CAD",
                  "topup_url": "/v1/wallet/topup"})
         paid = True
+        # if this charge pushed the wallet low, alert the business by email
+        wallet.check_low_balance(owner)
 
     status = "pending" if paid else "pending_payment"  # paid -> awaiting dispatch
     pay_status = "paid" if paid else "unpaid"
@@ -414,7 +424,7 @@ def dashboard(request):
     return render(request, "dashboard.html")
 
 
-def _issue_key(business, scopes=("create", "read", "cancel")):
+def _issue_key(business, scopes=("create", "read", "cancel"), email=None):
     """Create a test key for a business, seed its wallet, and audit it."""
     owner_id = str(uuid.uuid5(_KEY_NS, business.lower()))
     plaintext = keys.generate_key("test")
@@ -428,6 +438,7 @@ def _issue_key(business, scopes=("create", "read", "cancel")):
     # give a new business some test wallet funds so bookings can pay
     if wallet.get_balance(owner_id) == 0:
         wallet.topup(owner_id, STARTING_WALLET_CENTS)
+    wallet.set_email(owner_id, email)  # where to send low-balance alerts
     audit.log("key.created", business=business, key_prefix=keys.prefix_of(plaintext))
     return plaintext, owner_id
 
@@ -437,7 +448,8 @@ def _issue_key(business, scopes=("create", "read", "cancel")):
 def create_test_key(request):
     """Dashboard key creation — TEST keys only (live keys are issued by command)."""
     business = ((request.data or {}).get("business") or "Demo Business").strip()
-    plaintext, _ = _issue_key(business)
+    email = ((request.data or {}).get("email") or "").strip() or None
+    plaintext, _ = _issue_key(business, email=email)
     return Response({"key": plaintext, "prefix": keys.prefix_of(plaintext),
                      "business": business, "environment": "test",
                      "scopes": ["create", "read", "cancel"]}, status=201)
@@ -499,6 +511,7 @@ def wallet_balance(request):
         "currency": "CAD",
         "balance": round(balance_cents / 100, 2),
         "low_balance": statements.is_low(balance_cents),
+        "email": wallet.get_email(owner),
         "transactions": wallet.transactions(owner, 25),
     })
 
@@ -506,11 +519,66 @@ def wallet_balance(request):
 @api_view(["POST"])
 @authentication_classes([ApiKeyAuthentication])
 @permission_classes([IsAuthenticated])
+def wallet_set_email(request):
+    """Save the email address that low-balance alerts are sent to."""
+    owner = request.user.business_owner_id
+    email = ((request.data or {}).get("email") or "").strip()
+    if email and "@" not in email:
+        return error_response("validation_failed", "Invalid email.", 400,
+                              {"email": "must be a valid email address"})
+    wallet.set_email(owner, email)
+    return Response({"email": wallet.get_email(owner)})
+
+
+def _topup_page(inner):
+    return ("<!doctype html><html><body style='font-family:Arial,Helvetica,sans-serif;"
+            "text-align:center;padding:60px 20px;color:#1a1a1a'>" + inner +
+            "<p style='color:#888;margin-top:26px'>You can close this tab.</p></body></html>")
+
+
+def confirm_topup(request):
+    """One-click top-up from the low-balance email. The link is HMAC-signed, so a
+    click can only top up the business's own wallet and can't be forged or altered."""
+    from django.http import HttpResponse
+    owner = request.GET.get("owner", "")
+    answer = request.GET.get("answer", "")
+    try:
+        amount_cents = int(request.GET.get("amount", ""))
+    except (TypeError, ValueError):
+        return HttpResponse(_topup_page("<h2>Invalid link.</h2>"), status=400)
+    if not wallet.verify_topup_token(owner, amount_cents, request.GET.get("token", "")):
+        return HttpResponse(_topup_page("<h2>This link is invalid or was tampered with.</h2>"),
+                            status=400)
+    if answer == "yes":
+        new_cents = wallet.topup(owner, amount_cents, note="Top-up (from email)")
+        inner = ("<h2 style='color:#5b2fd6'>✅ Wallet topped up</h2>"
+                 f"<p>Added ${amount_cents / 100:.2f}. New balance: "
+                 f"<b>${new_cents / 100:.2f}</b>.</p>"
+                 "<script>try{var bc=new BroadcastChannel('aerrand');"
+                 "bc.postMessage({type:'wallet-updated'});"
+                 "setTimeout(function(){bc.close();},500);}catch(e){}</script>")
+    else:
+        inner = "<h2>No changes made</h2><p>Your wallet was not topped up.</p>"
+    return HttpResponse(_topup_page(inner))
+
+
+@api_view(["POST"])
+@authentication_classes([ApiKeyAuthentication])
+@permission_classes([IsAuthenticated])
 def wallet_topup(request):
     owner = request.user.business_owner_id
-    amount = (request.data or {}).get("amount", 50)
-    wallet.topup(owner, int(round(float(amount) * 100)))
-    return Response({"currency": "CAD", "balance": round(wallet.get_balance(owner) / 100, 2)})
+    raw = (request.data or {}).get("amount", 50)
+    try:
+        amount = float(raw)
+    except (TypeError, ValueError):
+        return error_response("validation_failed", "Invalid amount.", 400, {"amount": "must be a number"})
+    if amount <= 0 or amount > 100000:
+        return error_response("validation_failed", "Invalid amount.", 400,
+                              {"amount": "must be between 0 and 100000"})
+    cents = int(round(amount * 100))
+    new_balance = wallet.topup(owner, cents)
+    wallet.send_topup_email(owner, cents, new_balance)  # confirmation email
+    return Response({"currency": "CAD", "balance": round(new_balance / 100, 2)})
 
 
 # --------------------------------------------------------------------------- #
@@ -875,6 +943,22 @@ def wallet_statement_csv(request):
 def webhook_deliveries(request):
     require_scope(request, "read")
     return Response({"deliveries": webhooks.recent_deliveries(request.user.business_owner_id, 25)})
+
+
+# --------------------------------------------------------------------------- #
+# Send a real signed test event to a URL — POST /v1/webhooks/test
+# --------------------------------------------------------------------------- #
+@api_view(["POST"])
+@authentication_classes([ApiKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def webhook_send_test(request):
+    require_scope(request, "read")
+    url = (request.data or {}).get("url", "")
+    if not (url.startswith("https://") or url.startswith("http://")):
+        return error_response("validation_failed", "Invalid request.", 400,
+                              {"url": "an http(s):// url is required"})
+    result = webhooks.send_test_event(request.user.business_owner_id, url)
+    return Response(result, status=200)
 
 
 # --------------------------------------------------------------------------- #

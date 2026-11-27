@@ -9,6 +9,8 @@ import hashlib
 import hmac
 import json
 import time
+import urllib.error
+import urllib.request
 import uuid
 from datetime import datetime, timezone
 
@@ -132,6 +134,50 @@ def deliver(owner, event_type, errand):
         _deliveries().insert_one(rec)
         delivered.append(rec)
     return delivered
+
+
+def send_test_event(owner, url):
+    """Send a REAL signed test event to ``url`` over HTTP and log the attempt.
+
+    Unlike ``deliver()`` (which simulates the outbound call in test mode), this makes
+    an actual HTTP POST so a developer can confirm their endpoint receives the event
+    and can verify our ``Aerrand-Signature`` HMAC. Powers the portal's "Send test
+    event" button. A 5s timeout keeps a dead URL from hanging the request.
+    """
+    payload = {
+        "id": "evt_" + uuid.uuid4().hex[:16],
+        "type": "webhook.test",
+        "api_version": "2026-08-29",
+        "created": int(time.time()),
+        "test_mode": True,
+        "data": {"message": "This is a test event from Aerrand."},
+    }
+    body = json.dumps(payload, separators=(",", ":"))
+    signature = _sign(body)
+    req = urllib.request.Request(
+        url, data=body.encode(),
+        headers={"Content-Type": "application/json", "Aerrand-Signature": signature},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            status, ok = str(resp.status), 200 <= resp.status < 300
+    except urllib.error.HTTPError as e:
+        status, ok = str(e.code), False
+    except Exception as e:
+        status, ok = f"error: {e.__class__.__name__}", False
+    _deliveries().insert_one({
+        "id": "whd_" + uuid.uuid4().hex[:16],
+        "business_owner_id": owner,
+        "endpoint_id": "test",
+        "url": url,
+        "event_type": "webhook.test",
+        "errand_id": None,
+        "status": status,
+        "attempts": 1,
+        "at": datetime.now(timezone.utc),
+    })
+    return {"ok": ok, "status": status, "signature": signature, "event_id": payload["id"]}
 
 
 def recent_deliveries(owner, limit=25):

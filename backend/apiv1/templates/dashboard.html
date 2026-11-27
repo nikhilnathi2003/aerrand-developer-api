@@ -277,8 +277,19 @@
             <button class="ghost sm" onclick="topup(25)">+ $25</button>
             <button class="ghost sm" onclick="topup(50)">+ $50</button>
             <button class="ghost sm" onclick="topup(100)">+ $100</button>
+          </div>
+          <label style="margin-top:12px">Or enter your own amount (CAD)</label>
+          <div style="display:flex;gap:8px;max-width:380px">
+            <input id="topupAmt" type="number" min="1" step="1" placeholder="e.g. 75" style="flex:1">
+            <button class="sm" style="margin:0" onclick="topupCustom()">Add money</button>
           </div></div>
-        <div class="card"><h3>Transaction statement</h3>
+        <div class="card"><h3>Low-balance alert email</h3>
+          <p class="d">When the balance drops below $20 we email this address. New deliveries stay paused until you top up.</p>
+          <div style="display:flex;gap:8px;max-width:420px">
+            <input id="walletEmail" type="email" placeholder="you@company.com" style="flex:1">
+            <button class="sm" style="margin:0" onclick="saveWalletEmail()">Save</button>
+          </div><div class="result" id="walletEmailOut"></div></div>
+        <div class="card"><h3 style="display:flex;align-items:center;justify-content:space-between">Transaction statement <button class="ghost sm" style="margin:0" onclick="downloadCsv()">Download CSV</button></h3>
           <table><thead><tr><th>Type</th><th>Note</th><th>When</th><th style="text-align:right">Amount</th></tr></thead>
           <tbody id="txnRows"><tr><td colspan="4" class="empty">No transactions yet.</td></tr></tbody></table></div>
       </section>
@@ -288,6 +299,9 @@
         <div class="card"><h3>Register an endpoint</h3><p class="d">We push a signed event to your URL whenever a delivery changes state.</p>
           <label>Your https URL</label><input id="whUrl" value="https://example.com/aerrand/webhook">
           <button class="sm" onclick="registerWebhook()">Add endpoint</button><div class="result" id="whOut"></div></div>
+        <div class="card"><h3>Send a test event</h3><p class="d">Fires a <b>real signed event</b> to any URL so you can verify your endpoint — paste a free URL from <a href="https://webhook.site" target="_blank">webhook.site</a> and watch it arrive with the <span class="mono" style="background:none;border:0">Aerrand-Signature</span> header.</p>
+          <label>Destination URL</label><input id="whTestUrl" placeholder="https://webhook.site/your-unique-id">
+          <button class="sm" onclick="sendTestEvent()">Send test event</button><div class="result" id="whTestOut"></div></div>
         <div class="two">
           <div class="card"><h3>Event feed (signed)</h3><p class="d">Live events as deliveries progress.</p>
             <table><thead><tr><th>Event</th><th>Status</th><th>Signature</th></tr></thead><tbody id="evRows"><tr><td colspan="3" class="empty">No events yet.</td></tr></tbody></table></div>
@@ -302,6 +316,9 @@
   <span class="k">"data"</span>: { <span class="k">"errand_id"</span>: <span class="s">"8f1c…"</span>, <span class="k">"status"</span>: <span class="s">"delivered"</span> }
 }</pre></div>
         </div>
+        <div class="card"><h3>Delivery log</h3><p class="d">Every event sent to your endpoints, with its status — the outbox.</p>
+          <table><thead><tr><th>Event</th><th>Endpoint</th><th>Status</th><th>When</th></tr></thead>
+          <tbody id="whDelivRows"><tr><td colspan="4" class="empty">No deliveries yet — register an endpoint, then advance a delivery.</td></tr></tbody></table></div>
       </section>
 
       <!-- DOCS -->
@@ -313,12 +330,27 @@
 let API_KEY=null, QUOTE_ID=null, KEY_PREFIX=null, ERRAND_ID=null, BUSINESS="", PICKUP=null, DROP=null;
 const $=id=>document.getElementById(id);
 const money=n=>"$"+Number(n).toFixed(2);
+const _p2=n=>String(n).padStart(2,"0");
+// API timestamps are stored in UTC but come back without a timezone suffix; add "Z"
+// so the browser parses them as UTC, then displays in the viewer's LOCAL time.
+function _utcDate(iso){if(!iso)return new Date(NaN);const s=/([Zz]|[+-]\d\d:?\d\d)$/.test(iso)?iso:iso.replace(" ","T")+"Z";return new Date(s);}
+function fmtTime(iso){const d=_utcDate(iso);return isNaN(d.getTime())?(iso||"").slice(5,16).replace("T"," "):_p2(d.getMonth()+1)+"-"+_p2(d.getDate())+" "+_p2(d.getHours())+":"+_p2(d.getMinutes());}
+function fmtTimeFull(iso){const d=_utcDate(iso);return isNaN(d.getTime())?(iso||"").slice(0,19).replace("T"," "):d.getFullYear()+"-"+_p2(d.getMonth()+1)+"-"+_p2(d.getDate())+" "+_p2(d.getHours())+":"+_p2(d.getMinutes())+":"+_p2(d.getSeconds());}
+function fmtClock(iso){const d=_utcDate(iso);return isNaN(d.getTime())?(iso||"").slice(11,19):_p2(d.getHours())+":"+_p2(d.getMinutes())+":"+_p2(d.getSeconds());}
 const show=(el,h)=>{el.innerHTML=h;el.classList.add("show");};
 const fail=(el,m)=>show(el,'<span class="err">'+m+'</span>');
 const kv=(k,v)=>'<div class="kv"><span>'+k+'</span><b>'+v+'</b></div>';
 const TITLES={overview:"Overview",create:"Create delivery",deliveries:"Deliveries",tracking:"Live tracking",wallet:"Wallet",webhooks:"Webhooks"};
 let _tt; function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show");clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove("show"),2600);}
 function copy(txt){(navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast("Copied to clipboard")).catch(()=>toast("Copy not available"));}
+
+// Live-update across tabs: when a top-up happens from the email link (another tab),
+// refresh the wallet here automatically — no manual page refresh needed.
+try{
+  const _bc=new BroadcastChannel("aerrand");
+  _bc.onmessage=e=>{ if(e&&e.data&&e.data.type==="wallet-updated"&&API_KEY){ loadWallet(); toast("Wallet updated"); } };
+}catch(e){}
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&API_KEY) loadWallet(); });
 
 function nav(p){
   document.querySelectorAll(".page").forEach(s=>s.classList.remove("active"));
@@ -328,7 +360,7 @@ function nav(p){
   if(p==="overview"){loadErrands();loadEvents();loadActive();}
   if(p==="deliveries"){loadErrands();loadActive();}
   if(p==="wallet")loadWallet();
-  if(p==="webhooks")loadEvents();
+  if(p==="webhooks"){loadEvents();loadDeliveries();}
   if(p==="tracking"){ refreshTrack(); startTrackPolling(); } else { stopGraceCountdown(); stopTrackPolling(); _resetLeafletMap(); }
 }
 
@@ -391,9 +423,36 @@ async function loadWallet(){
   tx.forEach(t=>{ if(t.kind==="topup") added+=t.amount; else if(t.kind==="charge") spent+=-t.amount; });
   $("wAdded").textContent="+"+money(added);
   $("wSpent").textContent="-"+money(spent);
+  if($("walletEmail")) $("walletEmail").value = r.data.email || "";
   const label={topup:"Top-up",charge:"Charge",refund:"Refund"};
-  $("txnRows").innerHTML = tx.length? tx.map(t=>'<tr><td><span class="badge">'+(label[t.kind]||t.kind)+'</span></td><td>'+t.note+'</td><td>'+t.at.slice(5,16).replace("T"," ")+'</td><td style="text-align:right" class="'+(t.amount<0?'neg':'pos')+'">'+(t.amount<0?'':'+')+money(t.amount)+'</td></tr>').join("")
+  $("txnRows").innerHTML = tx.length? tx.map(t=>'<tr><td><span class="badge">'+(label[t.kind]||t.kind)+'</span></td><td>'+t.note+'</td><td>'+fmtTime(t.at)+'</td><td style="text-align:right" class="'+(t.amount<0?'neg':'pos')+'">'+(t.amount<0?'':'+')+money(t.amount)+'</td></tr>').join("")
     : '<tr><td colspan="4" class="empty">No transactions yet.</td></tr>';
+}
+function downloadCsv(){
+  const tx=window._txns||[];
+  if(!tx.length){ toast("No transactions to export"); return; }
+  const rows=[["Type","Note","When","Amount (CAD)"]].concat(
+    tx.map(t=>[t.kind, t.note, fmtTimeFull(t.at), t.amount]));
+  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(",")).join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="wallet-statement.csv"; a.click(); URL.revokeObjectURL(a.href);
+  toast("Statement downloaded");
+}
+async function topupCustom(){
+  const v=parseFloat($("topupAmt").value);
+  if(!(v>0)){ toast("Enter an amount greater than 0"); return; }
+  if(v>100000){ toast("Max top-up is $100,000"); return; }
+  await topup(v);
+  $("topupAmt").value="";
+}
+async function saveWalletEmail(){
+  if(!API_KEY){ toast("Generate a key first — on the “Create delivery” page"); return; }
+  const email=$("walletEmail").value.trim();
+  const r=await api("/v1/wallet/email","POST",{email});
+  if(!r.ok) return fail($("walletEmailOut"),(r.data.error&&r.data.error.message)||"Error");
+  show($("walletEmailOut"),'<b style="color:var(--violet)">Saved.</b> Low-balance alerts will go to '+(r.data.email||"(none)")+'.');
+  toast("Alert email saved");
 }
 async function topup(amount){
   if(!API_KEY){ toast("Generate a key first — on the “Create delivery” page"); return; }
@@ -544,7 +603,7 @@ function renderTrack(t){
     if(p.photo) meta += '<div style="margin-top:8px"><img src="'+p.photo+'" alt="Drop-off photo" style="max-width:100%;max-height:200px;border-radius:9px;border:1px solid var(--line)"></div>';
   }
   $("trackMeta").innerHTML = meta;
-  $("timeline").innerHTML=(t.timeline||[]).map(s=>'<li><b>'+statusLabel(s.status)+'</b> · '+s.at.slice(11,19)+' <span class="note" style="margin:0">· '+ago(s.at)+'</span></li>').join("");
+  $("timeline").innerHTML=(t.timeline||[]).map(s=>'<li><b>'+statusLabel(s.status)+'</b> · '+fmtClock(s.at)+' <span class="note" style="margin:0">· '+ago(s.at)+'</span></li>').join("");
   // Terminal state: hide Advance/Cancel and show a persistent summary card instead.
   const terminal=(t.status==="delivered"||t.status==="cancelled");
   $("trackActions").style.display = terminal ? "none" : "";
@@ -863,6 +922,22 @@ async function loadEvents(){
   $("ovEvents").innerHTML=ev.length?ev.slice(0,6).map(e=>'<tr><td><span class="badge">'+e.type+'</span></td><td>'+e.status+'</td></tr>').join(""):'<tr><td colspan="2" class="empty">No events yet.</td></tr>';
   const cat=await api("/v1/webhooks","GET");
   if(cat.ok) $("catalog").innerHTML=(cat.data.event_catalog||[]).map(c=>'<span class="badge" style="margin:2px">'+c+'</span>').join(" ");
+}
+async function loadDeliveries(){
+  const r=await api("/v1/webhooks/deliveries","GET"); if(!r.ok)return;
+  const d=r.data.deliveries||[];
+  $("whDelivRows").innerHTML=d.length?d.map(x=>'<tr><td><span class="badge">'+x.event_type+'</span></td><td class="mono" style="font-size:11px">'+x.url+'</td><td>'+x.status+'</td><td>'+fmtTime(x.at)+'</td></tr>').join(""):'<tr><td colspan="4" class="empty">No deliveries yet — register an endpoint, then advance a delivery.</td></tr>';
+}
+async function sendTestEvent(){
+  const url=$("whTestUrl").value.trim();
+  if(!url) return fail($("whTestOut"),"Enter a URL first.");
+  show($("whTestOut"),"Sending signed test event…");
+  const r=await api("/v1/webhooks/test","POST",{url});
+  if(!r.ok) return fail($("whTestOut"),(r.data.error&&r.data.error.message)||"Error");
+  const d=r.data;
+  if(d.ok) show($("whTestOut"),'<b style="color:var(--violet)">✅ Delivered — HTTP '+d.status+'.</b> Signed event '+d.event_id+' sent with the Aerrand-Signature header.');
+  else show($("whTestOut"),'<b style="color:#c0392b">Not delivered ('+d.status+').</b> The signed event was sent, but that URL didn\'t accept it.');
+  loadDeliveries();
 }
 async function registerWebhook(){
   const r=await api("/v1/webhooks","POST",{url:$("whUrl").value});

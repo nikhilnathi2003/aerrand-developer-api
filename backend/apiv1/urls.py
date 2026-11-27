@@ -22,6 +22,8 @@ urlpatterns = [
     # wallet (Charan)
     path("wallet", views.wallet_balance, name="wallet"),
     path("wallet/topup", views.wallet_topup, name="wallet-topup"),
+    path("wallet/email", views.wallet_set_email, name="wallet-email"),
+    path("wallet/confirm-topup", views.confirm_topup, name="wallet-confirm-topup"),
     path("wallet/statement.csv", views.wallet_statement_csv, name="wallet-statement"),
 
     # tracking + cancel + proof of delivery + live feed (Sai)
@@ -34,6 +36,7 @@ urlpatterns = [
     # webhooks + delivery log (team)
     path("webhooks", views.webhooks_collection, name="webhooks"),
     path("webhooks/deliveries", views.webhook_deliveries, name="webhook-deliveries"),
+    path("webhooks/test", views.webhook_send_test, name="webhook-send-test"),
     path("events", views.events_list, name="events"),
 
     # reporting (team)
